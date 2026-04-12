@@ -18,4 +18,8 @@ pnpm-debug.log*
 
 .trae/
 .agents/
+.superdesign/
+skills/
 skills-lock.json
+animate/
+animation-best-practices/
