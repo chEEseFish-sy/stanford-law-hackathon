@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Check, X, Info, FileText, ChevronRight } from "lucide-react";
+import { AlertTriangle, Check, X, Info, FileText, ChevronRight, AlertCircle } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 export function EvidenceReview() {

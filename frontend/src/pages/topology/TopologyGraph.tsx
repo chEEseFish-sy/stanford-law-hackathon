@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, type MouseEvent } from "react";
 import { 
   ReactFlow, 
   Background, 
@@ -8,7 +8,8 @@ import {
   useEdgesState, 
   addEdge,
   Connection,
-  Edge
+  Edge,
+  Node
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -23,16 +24,19 @@ const nodeTypes = {
 };
 
 export function TopologyGraph() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [nodes, , onNodesChange] = useNodesState(initialNodes as Node[]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as Edge[]);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const selectedData = selectedNode?.data as
+    | { label?: string; date?: string; details?: string; shares?: string }
+    | undefined;
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
-  const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
+  const onNodeClick = useCallback((_event: MouseEvent, node: Node) => {
     setSelectedNode(node);
   }, []);
 
@@ -87,34 +91,34 @@ export function TopologyGraph() {
           <div className="mt-4 flex-1">
             <div className="mb-4">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Type</label>
-              <div className="text-sm font-medium text-slate-700 capitalize">{selectedNode.type.replace(/([A-Z])/g, ' $1').trim()}</div>
+              <div className="text-sm font-medium text-slate-700 capitalize">{(selectedNode.type ?? "").replace(/([A-Z])/g, ' $1').trim()}</div>
             </div>
             
             <div className="mb-4">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Label</label>
-              <div className="text-base font-semibold text-slate-900">{selectedNode.data.label}</div>
+              <div className="text-base font-semibold text-slate-900">{selectedData?.label}</div>
             </div>
 
-            {selectedNode.data.date && (
+            {selectedData?.date && (
               <div className="mb-4">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Date</label>
-                <div className="text-sm font-medium text-slate-700">{selectedNode.data.date}</div>
+                <div className="text-sm font-medium text-slate-700">{selectedData.date}</div>
               </div>
             )}
 
-            {selectedNode.data.details && (
+            {selectedData?.details && (
               <div className="mb-4">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Extracted Details</label>
                 <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  {selectedNode.data.details}
+                  {selectedData.details}
                 </div>
               </div>
             )}
 
-            {selectedNode.data.shares && (
+            {selectedData?.shares && (
               <div className="mb-4">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Shares</label>
-                <div className="text-xl font-mono font-bold text-emerald-600">{selectedNode.data.shares}</div>
+                <div className="text-xl font-mono font-bold text-emerald-600">{selectedData.shares}</div>
               </div>
             )}
           </div>

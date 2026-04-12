@@ -1,9 +1,10 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { FileText, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 export const DocumentNode = memo(({ data, selected }: NodeProps) => {
+  const nodeData = data as { type?: string; label?: string; date?: string };
   return (
     <div className={cn(
       "px-4 py-3 shadow-lg rounded-xl bg-white border-2 min-w-[220px] transition-all duration-200",
@@ -13,15 +14,15 @@ export const DocumentNode = memo(({ data, selected }: NodeProps) => {
       <div className="flex items-center gap-3">
         <div className={cn(
           "p-2 rounded-lg",
-          data.type === "safe" ? "bg-emerald-100 text-emerald-600" : 
-          data.type === "board_consent" ? "bg-amber-100 text-amber-600" : 
+          nodeData.type === "safe" ? "bg-emerald-100 text-emerald-600" :
+          nodeData.type === "board_consent" ? "bg-amber-100 text-amber-600" :
           "bg-blue-100 text-blue-600"
         )}>
           <FileText className="w-5 h-5" />
         </div>
         <div>
-          <div className="text-sm font-bold text-slate-800">{data.label}</div>
-          <div className="text-xs text-slate-500 font-medium">{data.date}</div>
+          <div className="text-sm font-bold text-slate-800">{nodeData.label}</div>
+          <div className="text-xs text-slate-500 font-medium">{nodeData.date}</div>
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-slate-400" />
@@ -30,6 +31,7 @@ export const DocumentNode = memo(({ data, selected }: NodeProps) => {
 });
 
 export const EventNode = memo(({ data, selected }: NodeProps) => {
+  const nodeData = data as { status?: string; label?: string; details?: string };
   return (
     <div className={cn(
       "px-4 py-3 shadow-lg rounded-xl bg-indigo-50 border-2 min-w-[240px] transition-all duration-200",
@@ -38,20 +40,21 @@ export const EventNode = memo(({ data, selected }: NodeProps) => {
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-indigo-400" />
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs font-bold uppercase tracking-wider text-indigo-500">Event</div>
-        {data.status === "confirmed" ? (
+        {nodeData.status === "confirmed" ? (
           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
         ) : (
           <AlertCircle className="w-4 h-4 text-amber-500" />
         )}
       </div>
-      <div className="text-sm font-semibold text-slate-800">{data.label}</div>
-      <div className="text-xs text-slate-600 mt-1">{data.details}</div>
+      <div className="text-sm font-semibold text-slate-800">{nodeData.label}</div>
+      <div className="text-xs text-slate-600 mt-1">{nodeData.details}</div>
       <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-indigo-400" />
     </div>
   );
 });
 
 export const CapTableRowNode = memo(({ data, selected }: NodeProps) => {
+  const nodeData = data as { label?: string; shares?: string };
   return (
     <div className={cn(
       "px-4 py-3 shadow-xl rounded-xl bg-slate-800 border-2 min-w-[200px] text-white transition-all duration-200",
@@ -59,10 +62,10 @@ export const CapTableRowNode = memo(({ data, selected }: NodeProps) => {
     )}>
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-slate-500" />
       <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Cap Table Entry</div>
-      <div className="text-sm font-bold text-white">{data.label}</div>
+      <div className="text-sm font-bold text-white">{nodeData.label}</div>
       <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-700">
         <span className="text-xs text-slate-300">Shares:</span>
-        <span className="text-sm font-mono font-bold text-emerald-400">{data.shares}</span>
+        <span className="text-sm font-mono font-bold text-emerald-400">{nodeData.shares}</span>
       </div>
     </div>
   );

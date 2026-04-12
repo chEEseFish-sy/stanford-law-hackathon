@@ -1,4 +1,3 @@
-import React from "react";
 import { motion } from "framer-motion";
 import { FileText, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { cn } from "../../utils/cn";

@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
-import { cn } from "../../utils/cn";
 
 interface AppLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
