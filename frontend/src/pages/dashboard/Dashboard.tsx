@@ -10,6 +10,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import JSZip from "jszip";
+import * as docx from "docx-preview";
 import {
   ArrowUpRight,
   GitBranchPlus,
@@ -17,7 +18,6 @@ import {
   MessageSquare,
   PanelRightOpen,
   Send,
-  Sparkles,
   Upload,
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
@@ -28,9 +28,113 @@ interface UploadedPreviewDocument {
   fileName: string;
   kind: "text" | "docx" | "pdf" | "image" | "unsupported";
   content: string;
+  file?: File;
   objectUrl?: string;
   uploadedAt: string;
   summary: string;
+}
+
+function DocxViewer({ file }: { file: File }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectionRect, setSelectionRect] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !file) {
+      return;
+    }
+
+    const renderDocx = async () => {
+      try {
+        await docx.renderAsync(file, containerRef.current!, undefined, {
+          className: "docx-preview-wrapper",
+          inWrapper: true,
+          ignoreWidth: false,
+          ignoreHeight: false,
+          ignoreFonts: false,
+          breakPages: true,
+          ignoreLastRenderedPageBreak: true,
+          experimental: false,
+          trimXmlDeclaration: true,
+          debug: false,
+        });
+      } catch (error) {
+        console.error("Failed to render DOCX:", error);
+      }
+    };
+
+    void renderDocx();
+  }, [file]);
+
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0 && containerRef.current?.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      setSelectionRect({
+        top: rect.top - containerRect.top,
+        left: rect.left - containerRect.left,
+        width: rect.width,
+      });
+    } else {
+      setSelectionRect(null);
+    }
+  };
+
+  const applyHighlight = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const span = document.createElement("span");
+    span.className = "bg-orange-300/40 border-b-2 border-orange-500 rounded-sm";
+
+    try {
+      range.surroundContents(span);
+      selection.removeAllRanges();
+      setSelectionRect(null);
+    } catch (e) {
+      console.error("Could not highlight across multiple nodes", e);
+      // For complex multi-node selections, a more advanced range-wrapping library would be needed.
+      // But this handles standard text block highlighting out of the box.
+      alert("Please select text within a single paragraph to highlight.");
+    }
+  };
+
+  return (
+    <div className="relative w-full">
+      <div
+        ref={containerRef}
+        onMouseUp={handleSelection}
+        className="docx-viewer-container w-full overflow-hidden rounded-[12px] bg-white text-black [&_.docx-preview-wrapper]:!bg-white [&_.docx-preview-wrapper]:!p-8 [&_section]:!shadow-none [&_section]:!bg-white [&_section]:!min-h-0 [&_section]:!h-auto"
+      />
+      
+      <AnimatePresence>
+        {selectionRect ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            style={{
+              position: "absolute",
+              top: Math.max(0, selectionRect.top - 40),
+              left: selectionRect.left + selectionRect.width / 2 - 40,
+            }}
+            className="z-50"
+          >
+            <button
+              onClick={applyHighlight}
+              className="flex items-center gap-1.5 rounded-full border border-orange-300/20 bg-black/80 px-3 py-1.5 text-xs font-medium text-orange-200 shadow-xl backdrop-blur-md transition hover:bg-black hover:text-orange-100"
+            >
+              Highlight
+            </button>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export function Dashboard() {
@@ -49,8 +153,8 @@ export function Dashboard() {
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
-  const [leftPaneWidth, setLeftPaneWidth] = useState(320);
-  const [rightPaneWidth, setRightPaneWidth] = useState(340);
+  const [leftPaneWidth, setLeftPaneWidth] = useState(260);
+  const [rightPaneWidth, setRightPaneWidth] = useState(280);
   const [historyPaneHeight, setHistoryPaneHeight] = useState(220);
   const [resizeMode, setResizeMode] = useState<"left" | "right" | "history" | null>(null);
   const [topologyOpen, setTopologyOpen] = useState(false);
@@ -59,11 +163,43 @@ export function Dashboard() {
   const rightPaneRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const documentItems = useMemo(
+    () => [
+      ...uploadedDocuments.map((document) => ({
+        id: document.id,
+        fileName: document.fileName,
+        uploadedAt: document.uploadedAt,
+        evidenceStatus: "uploaded" as const,
+        summary: document.summary,
+        isUpload: true,
+      })),
+      ...documents.map((document) => ({
+        id: document.id,
+        fileName: document.fileName,
+        uploadedAt: document.transactionDate ?? document.uploadedAt.slice(0, 10),
+        evidenceStatus: document.evidenceStatus,
+        summary: document.summary,
+        isUpload: false,
+      })),
+    ],
+    [documents, uploadedDocuments],
+  );
+
   useEffect(() => {
-    if (!selectedDocumentId && documents[0]) {
-      setSelectedDocumentId(documents[0].id);
+    if (!selectedDocumentId && documentItems[0]) {
+      setSelectedDocumentId(documentItems[0].id);
     }
-  }, [documents, selectedDocumentId]);
+  }, [documentItems, selectedDocumentId]);
+
+  useEffect(() => {
+    return () => {
+      uploadedDocuments.forEach((document) => {
+        if (document.objectUrl) {
+          URL.revokeObjectURL(document.objectUrl);
+        }
+      });
+    };
+  }, [uploadedDocuments]);
 
   useEffect(() => {
     if (!resizeMode) {
@@ -109,6 +245,109 @@ export function Dashboard() {
     };
   }, [resizeMode]);
 
+  const extractDocxText = useCallback(async (file: File) => {
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const xml = await zip.file("word/document.xml")?.async("string");
+
+    if (!xml) {
+      return "Unable to read the DOCX body.";
+    }
+
+    const parsed = new DOMParser().parseFromString(xml, "application/xml");
+    const text = Array.from(parsed.getElementsByTagName("w:t"))
+      .map((node) => node.textContent ?? "")
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return text || "The DOCX file does not contain readable body text.";
+  }, []);
+
+  const buildUploadedPreview = useCallback(
+    async (file: File): Promise<UploadedPreviewDocument> => {
+      const lowerName = file.name.toLowerCase();
+      const id = `upload-${crypto.randomUUID()}`;
+      const uploadedAt = new Date().toISOString().slice(0, 10);
+
+      if (/\.(txt|md|csv|json|ts|tsx|js|jsx|py|sql)$/i.test(lowerName)) {
+        const content = await file.text();
+        return {
+          id,
+          fileName: file.name,
+          kind: "text",
+          content,
+          uploadedAt,
+          summary: "Local text preview loaded.",
+        };
+      }
+
+      if (/\.docx$/i.test(lowerName)) {
+        const content = await extractDocxText(file);
+        return {
+          id,
+          fileName: file.name,
+          kind: "docx",
+          content,
+          file,
+          uploadedAt,
+          summary: "DOCX document loaded for preview.",
+        };
+      }
+
+      if (/\.pdf$/i.test(lowerName)) {
+        return {
+          id,
+          fileName: file.name,
+          kind: "pdf",
+          content: "",
+          objectUrl: URL.createObjectURL(file),
+          uploadedAt,
+          summary: "PDF preview loaded.",
+        };
+      }
+
+      if (/\.(png|jpg|jpeg|gif|webp)$/i.test(lowerName)) {
+        return {
+          id,
+          fileName: file.name,
+          kind: "image",
+          content: "",
+          objectUrl: URL.createObjectURL(file),
+          uploadedAt,
+          summary: "Image preview loaded.",
+        };
+      }
+
+      return {
+        id,
+        fileName: file.name,
+        kind: "unsupported",
+        content: "",
+        uploadedAt,
+        summary: "Preview is not supported for this file type yet.",
+      };
+    },
+    [extractDocxText],
+  );
+
+  const handleFiles = useCallback(
+    async (input: FileList | File[]) => {
+      const files = Array.from(input);
+
+      if (files.length === 0) {
+        return;
+      }
+
+      const nextDocuments = await Promise.all(files.map((file) => buildUploadedPreview(file)));
+      setUploadedDocuments((current) => [...nextDocuments, ...current]);
+      setSelectedDocumentId(nextDocuments[0].id);
+      setIsDraggingFiles(false);
+    },
+    [buildUploadedPreview],
+  );
+
+  const activeUploadedDocument =
+    uploadedDocuments.find((document) => document.id === selectedDocumentId) ?? null;
   const activeDocument = documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null;
   const activePreview =
     previews.find((preview) => preview.documentId === activeDocument?.id) ?? previews[0] ?? null;
@@ -118,14 +357,6 @@ export function Dashboard() {
     comparisons[0] ??
     null;
   const activeChange = activeComparison?.changes[0] ?? null;
-  const statusCounts = useMemo(
-    () => ({
-      conflicts: documents.filter((document) => document.evidenceStatus === "conflict").length,
-      verified: documents.filter((document) => document.evidenceStatus === "verified").length,
-    }),
-    [documents],
-  );
-
   const renderExcerpt = () => {
     if (!activePreview) {
       return "Select a document from the right panel.";
@@ -220,27 +451,35 @@ export function Dashboard() {
           className="flex h-full min-w-0 flex-col border-r border-white/10 bg-white/[0.04]"
           style={{ width: leftPaneWidth }}
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="border-b border-white/10 px-4 py-3">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-orange-500/12 p-3 text-orange-100">
                 <MessageSquare className="h-5 w-5" />
               </div>
               <div className="text-sm font-semibold text-white">AI chat</div>
             </div>
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
-              Online
-            </span>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
-            <div className="rounded-[18px] border border-white/8 bg-black/18 p-3 text-sm leading-6 text-white/72">
-              I loaded the latest file set and connected each cap table entry to a source clause.
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+            <div className="flex flex-col items-start gap-1">
+              <div className="rounded-[18px] rounded-tl-sm border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white/80 max-w-[95%]">
+                Hello! I'm VeriCap AI. I've loaded the workspace. What would you like to verify today?
+              </div>
+              <div className="text-[10px] text-white/30 ml-1">10:00 AM</div>
             </div>
-            <div className="rounded-[18px] border border-orange-300/18 bg-orange-500/10 p-3 text-sm leading-6 text-white">
-              The current blocker is still the missing stockholder consent in the approval package.
+            
+            <div className="flex flex-col items-end gap-1">
+              <div className="rounded-[18px] rounded-tr-sm border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm leading-6 text-orange-50 max-w-[95%]">
+                Can you check if the Cap Table matches the latest SAFE documents?
+              </div>
+              <div className="text-[10px] text-white/30 mr-1">10:01 AM</div>
             </div>
-            <div className="rounded-[18px] border border-white/8 bg-black/18 p-3 text-sm leading-6 text-white/72">
-              Ask me what changed, whether the latest edit should be accepted, or why the current version branched.
+
+            <div className="flex flex-col items-start gap-1">
+              <div className="rounded-[18px] rounded-tl-sm border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white/80 max-w-[95%]">
+                I found a discrepancy. The Series Seed round in the Cap Table shows $2M raised, but the SAFE documents aggregate to $2.5M. I've highlighted the conflict in the document viewer.
+              </div>
+              <div className="text-[10px] text-white/30 ml-1">10:01 AM</div>
             </div>
           </div>
 
@@ -270,17 +509,51 @@ export function Dashboard() {
           <span className="absolute left-1/2 top-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 transition group-hover:bg-orange-300/60" />
         </div>
 
-        <section className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white/[0.03]">
+        <section
+          className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white/[0.03]"
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDraggingFiles(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) {
+              setIsDraggingFiles(false);
+            }
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFiles(false);
+            void handleFiles(event.dataTransfer.files);
+          }}
+        >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div>
               <div className="text-[11px] uppercase tracking-[0.24em] text-orange-200/70">
-                {activeDocument?.fileName ?? "Document"}
+                {activeUploadedDocument?.fileName ?? activeDocument?.fileName ?? "Document"}
               </div>
-              <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
-                {activeComparison?.title ?? activePreview?.title ?? "Document compare"}
-              </h2>
             </div>
             <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                accept=".txt,.md,.csv,.json,.docx,.pdf,.png,.jpg,.jpeg,.gif,.webp"
+                onChange={(event) => {
+                  if (event.target.files) {
+                    void handleFiles(event.target.files);
+                  }
+                  event.currentTarget.value = "";
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white transition hover:bg-white/[0.08] active:scale-95"
+              >
+                <Upload className="h-4 w-4 text-orange-200" />
+                Upload
+              </button>
               <button
                 onClick={() => setTopologyOpen(true)}
                 className="flex items-center gap-2 rounded-full border border-orange-300/18 bg-orange-500/10 px-4 py-2 text-sm text-white transition hover:bg-orange-500/16 active:scale-95"
@@ -288,102 +561,139 @@ export function Dashboard() {
                 <PanelRightOpen className="h-4 w-4 text-orange-200" />
                 Topology
               </button>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/48">
-                {statusCounts.conflicts} conflicts
-              </span>
             </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <div className="grid min-h-full grid-rows-[420px_minmax(190px,auto)]">
-            <div className="grid min-h-0 grid-cols-2 border-b border-white/10">
-              <div className="min-h-0 border-r border-white/10 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-sm font-semibold text-white">Previous</div>
-                  <span className="text-xs text-white/35">
-                    {activeComparison?.changes[0]?.sourceLabel ?? activePreview?.highlightedPhrases[0]?.sourceLabel}
-                  </span>
-                </div>
-                <div className="h-full overflow-y-auto rounded-[18px] border border-white/8 bg-black/18 p-4 text-sm leading-6 text-white/60">
-                  {activeChange?.previousText ?? activePreview?.excerpt ?? "No previous text loaded."}
-                </div>
-              </div>
-
-              <div className="min-h-0 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-sm font-semibold text-white">Current</div>
-                  <span
-                    className={cn(
-                      "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
-                      activeComparison?.assessment === "good"
-                        ? "bg-emerald-500/12 text-emerald-100"
-                        : activeComparison?.assessment === "bad"
-                          ? "bg-rose-500/12 text-rose-100"
-                          : "bg-amber-500/12 text-amber-100",
-                    )}
-                  >
-                    {activeComparison?.assessment?.replace(/_/g, " ") ?? "live"}
-                  </span>
-                </div>
-                <div className="h-full overflow-y-auto rounded-[18px] border border-orange-300/14 bg-orange-500/10 p-4 text-sm leading-6 text-white/84">
-                  {activeChange?.currentText ?? renderExcerpt()}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-[0.9fr,1.1fr]">
-              <div className="border-r border-white/10 p-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Sparkles className="h-4 w-4 text-orange-200" />
-                  AI readout
-                </div>
-                <div className="mt-2 text-sm leading-6 text-white/62">
-                  {activeComparison?.summary ?? activeDocument?.summary ?? "No summary loaded."}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {(activePreview?.highlightedPhrases ?? []).map((phrase) => (
-                    <span
-                      key={`${phrase.sourceLabel}-${phrase.text}`}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs",
-                        phrase.tone === "good"
-                          ? "border-emerald-300/22 bg-emerald-500/10 text-emerald-100"
-                          : phrase.tone === "bad"
-                            ? "border-amber-300/22 bg-amber-500/10 text-amber-100"
-                            : "border-white/10 bg-white/[0.05] text-white/68",
-                      )}
-                    >
-                      {phrase.sourceLabel}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-white">Working cap table</div>
-                  <span className="text-xs text-white/35">{currentVersion?.versionName}</span>
-                </div>
-                <div className="mt-2 grid gap-1.5">
-                  {(currentVersion?.rows ?? []).slice(0, 4).map((row) => (
-                    <div
-                      key={`${row.holderName}-${row.securityType}`}
-                      className="flex items-center justify-between rounded-[16px] border border-white/8 bg-white/[0.03] px-3 py-2.5"
-                    >
-                      <div>
-                        <div className="text-sm font-medium text-white">{row.holderName}</div>
-                        <div className="text-xs text-white/42">{row.sourceLocation}</div>
+            {activeUploadedDocument ? (
+              <div className="min-h-full p-3">
+                <div className="rounded-[18px] border border-white/10 bg-black/18 p-3">
+                  <div className="rounded-[16px] border border-orange-300/14 bg-orange-500/10 p-4">
+                    {activeUploadedDocument.kind === "pdf" && activeUploadedDocument.objectUrl ? (
+                      <iframe
+                        title={activeUploadedDocument.fileName}
+                        src={activeUploadedDocument.objectUrl}
+                        className="h-[900px] w-full rounded-[12px] bg-white"
+                      />
+                    ) : null}
+                    {activeUploadedDocument.kind === "image" && activeUploadedDocument.objectUrl ? (
+                      <img
+                        src={activeUploadedDocument.objectUrl}
+                        alt={activeUploadedDocument.fileName}
+                        className="max-h-none w-full rounded-[12px] object-contain"
+                      />
+                    ) : null}
+                    {activeUploadedDocument.kind === "docx" && activeUploadedDocument.file ? (
+                      <DocxViewer file={activeUploadedDocument.file} />
+                    ) : null}
+                    {activeUploadedDocument.kind === "text" ? (
+                      <pre className="min-h-[900px] whitespace-pre-wrap break-words font-sans text-sm leading-7 text-white/84">
+                        {activeUploadedDocument.content}
+                      </pre>
+                    ) : null}
+                    {activeUploadedDocument.kind === "unsupported" ? (
+                      <div className="flex min-h-[320px] items-center justify-center text-sm text-white/58">
+                        Preview is not available for this file type yet.
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-white">{row.shares.toLocaleString()}</div>
-                        <div className="text-xs text-white/42">{row.securityType}</div>
-                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col min-h-full">
+                <div className="grid min-h-0 h-[480px] shrink-0 grid-cols-2 border-b border-white/10">
+                  <div className="flex flex-col min-h-0 border-r border-white/10 p-4">
+                    <div className="mb-3 flex shrink-0 items-center justify-between">
+                      <div className="text-sm font-semibold text-white">Previous</div>
+                      <span className="text-xs text-white/35">
+                        {activeComparison?.changes[0]?.sourceLabel ?? activePreview?.highlightedPhrases[0]?.sourceLabel}
+                      </span>
                     </div>
-                  ))}
+                    <div className="flex-1 min-h-0 overflow-y-auto rounded-[18px] border border-white/8 bg-black/18 p-5 text-[14.5px] leading-7 text-white/60">
+                      {activeChange?.previousText ?? activePreview?.excerpt ?? "No previous text loaded."}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col min-h-0 p-4">
+                    <div className="mb-3 flex shrink-0 items-center justify-between">
+                      <div className="text-sm font-semibold text-white">Current</div>
+                      <span
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
+                          activeComparison?.assessment === "good"
+                            ? "bg-emerald-500/12 text-emerald-100"
+                            : activeComparison?.assessment === "bad"
+                              ? "bg-rose-500/12 text-rose-100"
+                              : "bg-amber-500/12 text-amber-100",
+                        )}
+                      >
+                        {activeComparison?.assessment?.replace(/_/g, " ") ?? "live"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto rounded-[18px] border border-orange-300/14 bg-orange-500/10 p-5 text-[14.5px] leading-7 text-white/84">
+                      {activeChange?.currentText ?? renderExcerpt()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid flex-1 grid-cols-[0.9fr,1.1fr]">
+                  <div className="flex flex-col justify-center border-r border-white/10 p-6">
+                    <div className="text-[14.5px] leading-relaxed text-white/70">
+                      {activeComparison?.summary ?? activeDocument?.summary ?? "No summary loaded."}
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {(activePreview?.highlightedPhrases ?? []).map((phrase) => (
+                        <span
+                          key={`${phrase.sourceLabel}-${phrase.text}`}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-xs font-medium",
+                            phrase.tone === "good"
+                              ? "border-emerald-300/22 bg-emerald-500/10 text-emerald-100"
+                              : phrase.tone === "bad"
+                                ? "border-amber-300/22 bg-amber-500/10 text-amber-100"
+                                : "border-white/10 bg-white/[0.05] text-white/68",
+                          )}
+                        >
+                          {phrase.sourceLabel}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-center p-6">
+                    <div className="mb-4 flex shrink-0 items-center justify-between">
+                      <div className="text-sm font-semibold text-white">Cap table</div>
+                      <span className="text-xs text-white/35">{currentVersion?.versionName}</span>
+                    </div>
+                    <div className="grid gap-2">
+                      {(currentVersion?.rows ?? []).slice(0, 4).map((row) => (
+                        <div
+                          key={`${row.holderName}-${row.securityType}`}
+                          className="flex items-center justify-between rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3"
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-white">{row.holderName}</div>
+                            <div className="mt-0.5 text-[11px] text-white/42">{row.sourceLocation}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-white">{row.shares.toLocaleString()}</div>
+                            <div className="mt-0.5 text-[11px] text-white/42">{row.securityType}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            </div>
+            )}
+            {isDraggingFiles ? (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/72 backdrop-blur-sm">
+                <div className="rounded-[24px] border border-orange-300/24 bg-orange-500/10 px-8 py-6 text-center">
+                  <Upload className="mx-auto h-7 w-7 text-orange-200" />
+                  <div className="mt-3 text-base font-semibold text-white">Drop files</div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <AnimatePresence>
@@ -443,7 +753,7 @@ export function Dashboard() {
           style={{ width: rightPaneWidth }}
         >
           <div
-            className="min-h-0 overflow-hidden border-b border-white/10"
+            className="flex flex-col min-h-0 overflow-hidden border-b border-white/10"
             style={{ height: historyPaneHeight }}
           >
             <div className="flex items-center justify-between px-4 py-3">
@@ -458,7 +768,7 @@ export function Dashboard() {
                 Expand
               </button>
             </div>
-            <div className="space-y-1.5 overflow-y-auto px-3 pb-3">
+            <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 pb-3">
               {versionNodes.map((node) => (
                 <button
                   key={node.id}
@@ -493,18 +803,18 @@ export function Dashboard() {
             <span className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 transition group-hover:bg-orange-300/60" />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
                 <GitBranchPlus className="h-4 w-4 text-orange-200" />
                 Files
               </div>
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/48">
-                {documents.length}
+                {documentItems.length}
               </span>
             </div>
-            <div className="space-y-1.5 overflow-y-auto px-3 pb-3">
-              {documents.map((document) => (
+            <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 pb-3">
+              {documentItems.map((document) => (
                 <button
                   key={document.id}
                   onClick={() => setSelectedDocumentId(document.id)}
@@ -518,9 +828,7 @@ export function Dashboard() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-white">{document.fileName}</div>
-                      <div className="mt-1 text-xs text-white/40">
-                        {document.transactionDate ?? document.uploadedAt.slice(0, 10)}
-                      </div>
+                      <div className="mt-1 text-xs text-white/40">{document.uploadedAt}</div>
                     </div>
                     <span
                       className={cn(
@@ -529,6 +837,8 @@ export function Dashboard() {
                           ? "bg-emerald-500/12 text-emerald-100"
                           : document.evidenceStatus === "conflict"
                             ? "bg-amber-500/12 text-amber-100"
+                            : document.evidenceStatus === "uploaded"
+                              ? "bg-sky-500/12 text-sky-100"
                             : document.evidenceStatus === "rejected"
                               ? "bg-rose-500/12 text-rose-100"
                               : "bg-white/[0.08] text-white/55",
