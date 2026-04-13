@@ -17,6 +17,7 @@ __pycache__/
 *.py[cod]
 .venv/
 *.tsbuildinfo
+processed_data/*.sqlite3
 frontend/vite.config.js
 frontend/vite.config.d.ts
 

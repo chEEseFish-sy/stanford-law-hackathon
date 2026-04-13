@@ -32,7 +32,7 @@ const API_BASE_URL =
   "http://127.0.0.1:8000";
 
 export function DocumentIntake() {
-  const { snapshot, endpoints } = useWorkbench();
+  const { snapshot, endpoints, refresh, uploadFiles } = useWorkbench();
   const workspaceDocuments = useMemo(() => snapshot?.documents ?? [], [snapshot]);
   const previews = useMemo(() => snapshot?.documentPreviews ?? [], [snapshot]);
   const [processedDocuments, setProcessedDocuments] = useState<IndexedDocument[]>([]);
@@ -118,25 +118,19 @@ export function DocumentIntake() {
     setMessage(null);
     setError(null);
 
-    const formData = new FormData();
-    selectedFiles.forEach((file) => formData.append("files", file));
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/documents`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        const detail = data?.failures?.[0]?.error ?? data?.detail ?? `Upload failed (${response.status})`;
-        throw new Error(detail);
-      }
-      setProcessedDocuments(data.index?.documents ?? []);
+      const data = await uploadFiles(selectedFiles);
+      const index = data.index as DocumentIndex | undefined;
+      setProcessedDocuments(index?.documents ?? []);
       setSelectedFiles([]);
       if (inputRef.current) {
         inputRef.current.value = "";
       }
-      setMessage(`${data.processed?.length ?? 0} document(s) saved and processed`);
+      await refresh();
+      const currentVersion = data.workbench?.captableVersions.find((version) => version.status === "current");
+      setMessage(
+        `${data.processed?.length ?? 0} document(s) saved, ${data.topology_updates?.length ?? 0} topology update(s), current version: ${currentVersion?.versionName ?? "unchanged"}`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {

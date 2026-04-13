@@ -28,6 +28,21 @@ from process_docx_data import (
     safe_stem,
     write_json,
 )
+from workbench_store import (
+    DEFAULT_CASE_ID,
+    build_index_from_db,
+    build_workbench_snapshot,
+    get_node_detail,
+    ingest_processed_result,
+    init_store,
+    merge_node,
+    set_viewing_version,
+    update_node_status,
+)
+
+ROOT_DIR = SCRIPT_DIR.parent
+DEFAULT_INPUT_DIR = (ROOT_DIR / DEFAULT_INPUT_DIR).resolve() if not DEFAULT_INPUT_DIR.is_absolute() else DEFAULT_INPUT_DIR
+DEFAULT_OUTPUT_DIR = (ROOT_DIR / DEFAULT_OUTPUT_DIR).resolve() if not DEFAULT_OUTPUT_DIR.is_absolute() else DEFAULT_OUTPUT_DIR
 
 
 app = FastAPI(title="Document Processing Pipeline")
@@ -45,6 +60,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+init_store()
 
 
 def pipeline_model_name() -> str:
@@ -78,6 +95,73 @@ def health() -> dict[str, str]:
 @app.get("/api/documents")
 def list_documents() -> dict:
     DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    return build_index_from_db(DEFAULT_CASE_ID)
+
+
+@app.get("/api/workbench")
+def get_workbench(case_id: str = DEFAULT_CASE_ID) -> dict:
+    return build_workbench_snapshot(case_id)
+
+
+@app.get("/api/cases/{case_id}/topology")
+def get_case_topology(case_id: str) -> dict:
+    return build_workbench_snapshot(case_id)["topology"]
+
+
+@app.get("/api/topology/nodes/{node_id}/detail")
+def get_topology_node_detail(node_id: str) -> dict:
+    try:
+        return get_node_detail(node_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found") from exc
+
+
+@app.post("/api/topology/nodes/{node_id}/merge")
+def merge_topology_node(node_id: str) -> dict:
+    try:
+        return merge_node(node_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found") from exc
+
+
+@app.post("/api/topology/nodes/{node_id}/reject")
+def reject_topology_node(node_id: str) -> dict:
+    try:
+        return update_node_status(node_id, "rejected", "reject")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found") from exc
+
+
+@app.post("/api/topology/nodes/{node_id}/archive")
+def archive_topology_node(node_id: str) -> dict:
+    try:
+        return update_node_status(node_id, "archived", "archive")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found") from exc
+
+
+@app.post("/api/cases/{case_id}/viewing-version")
+def switch_viewing_version(case_id: str, node_id: Annotated[str, Form()]) -> dict:
+    try:
+        return set_viewing_version(case_id, node_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found") from exc
+
+
+@app.post("/api/cases/{case_id}/files")
+def upload_case_files(
+    case_id: str,
+    files: Annotated[list[UploadFile], File()],
+    use_llm: Annotated[bool, Form()] = False,
+    task: Annotated[list[str] | None, Form()] = None,
+) -> JSONResponse:
+    response = process_uploads(case_id, files, use_llm, task)
+    return JSONResponse(status_code=response["status_code"], content=response["content"])
+
+
+@app.get("/api/documents-legacy")
+def list_documents_legacy() -> dict:
+    DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     index_path = DEFAULT_OUTPUT_DIR / "index.json"
     if not index_path.exists():
         return refresh_index()
@@ -93,6 +177,16 @@ def upload_documents(
     use_llm: Annotated[bool, Form()] = False,
     task: Annotated[list[str] | None, Form()] = None,
 ) -> JSONResponse:
+    response = process_uploads(DEFAULT_CASE_ID, files, use_llm, task)
+    return JSONResponse(status_code=response["status_code"], content=response["content"])
+
+
+def process_uploads(
+    case_id: str,
+    files: list[UploadFile],
+    use_llm: bool,
+    task: list[str] | None,
+) -> dict:
     DEFAULT_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -103,6 +197,7 @@ def upload_documents(
 
     processed = []
     failures = []
+    topology_updates = []
 
     for upload in files:
         original_name = Path(upload.filename or "").name
@@ -132,6 +227,13 @@ def upload_documents(
                     "output_file": f"{safe_stem(destination)}.json",
                 }
             )
+            topology_updates.append(
+                ingest_processed_result(
+                    case_id=case_id,
+                    result=result,
+                    source_path=str(destination),
+                )
+            )
         except Exception as exc:  # noqa: BLE001 - report per-file failures to the UI.
             failures.append({"source_file": original_name, "error": str(exc)})
         finally:
@@ -139,14 +241,17 @@ def upload_documents(
 
     index = refresh_index()
     status_code = 207 if failures and processed else 400 if failures else 200
-    return JSONResponse(
-        status_code=status_code,
-        content={
+    workbench = build_workbench_snapshot(case_id)
+    return {
+        "status_code": status_code,
+        "content": {
             "processed": processed,
             "failures": failures,
             "index": index,
+            "topology_updates": topology_updates,
+            "workbench": workbench,
         },
-    )
+    }
 
 
 def unique_destination(path: Path) -> Path:
