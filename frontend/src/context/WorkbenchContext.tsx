@@ -16,12 +16,14 @@ interface WorkbenchContextValue {
   selectedNodeId: string | null;
   selectedNodeDetail: TopologyNodeDetail | null;
   detailLoading: boolean;
+  apiError: string | null;
   endpoints: ReturnType<typeof topologyApi.getEndpointMap>;
   selectNode: (nodeId: string | null) => Promise<void>;
   mergeNode: (nodeId: string) => Promise<void>;
   rejectNode: (nodeId: string) => Promise<void>;
   archiveNode: (nodeId: string) => Promise<void>;
   setViewingVersion: (nodeId: string) => Promise<void>;
+  uploadFiles: (files: File[]) => Promise<Awaited<ReturnType<typeof topologyApi.uploadFiles>>>;
   refresh: () => Promise<void>;
 }
 
@@ -31,6 +33,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<TopologyNodeDetail | null>(null);
 
@@ -38,6 +41,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     const next = await topologyApi.getWorkbenchSnapshot();
     setSnapshot(next);
+    setApiError(topologyApi.getLastError());
     setLoading(false);
   }, []);
 
@@ -54,19 +58,22 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     }
 
     setDetailLoading(true);
-    const detail = await topologyApi.getNodeDetail(nodeId);
-    setSelectedNodeDetail(detail);
-    setDetailLoading(false);
-  }, []);
+      const detail = await topologyApi.getNodeDetail(nodeId);
+      setSelectedNodeDetail(detail);
+      setApiError(topologyApi.getLastError());
+      setDetailLoading(false);
+    }, []);
 
   const syncAfterMutation = useCallback(async (nodeId?: string) => {
     const next = await topologyApi.getWorkbenchSnapshot();
     setSnapshot(next);
+    setApiError(topologyApi.getLastError());
 
     if (nodeId) {
       const detail = await topologyApi.getNodeDetail(nodeId);
       setSelectedNodeId(nodeId);
       setSelectedNodeDetail(detail);
+      setApiError(topologyApi.getLastError());
     }
   }, []);
 
@@ -102,6 +109,13 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     [selectedNodeId, syncAfterMutation],
   );
 
+  const uploadFiles = useCallback(async (files: File[]) => {
+    const result = await topologyApi.uploadFiles(files);
+    setSnapshot(result.workbench);
+    setApiError(topologyApi.getLastError());
+    return result;
+  }, []);
+
   const value = useMemo<WorkbenchContextValue>(
     () => ({
       snapshot,
@@ -109,16 +123,19 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       selectedNodeId,
       selectedNodeDetail,
       detailLoading,
+      apiError,
       endpoints: topologyApi.getEndpointMap(),
       selectNode,
       mergeNode,
       rejectNode,
       archiveNode,
       setViewingVersion,
+      uploadFiles,
       refresh,
     }),
     [
       archiveNode,
+      apiError,
       detailLoading,
       loading,
       mergeNode,
@@ -128,6 +145,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       selectedNodeDetail,
       selectedNodeId,
       setViewingVersion,
+      uploadFiles,
       snapshot,
     ],
   );
