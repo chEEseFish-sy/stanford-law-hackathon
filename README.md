@@ -211,7 +211,3 @@ python3 scripts/process_docx_data.py --input data_process --output processed_dat
 - The cap table is a working audit view, not a final legal determination.
 - LLM extraction depends on the configured model and API key.
 - Complex securities, multi-jurisdiction legal rules, and final legal opinions are outside the current prototype scope.
-
-## Team
-
-Kuanze Ma; Alessandro Meyer
