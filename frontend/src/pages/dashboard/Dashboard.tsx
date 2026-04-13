@@ -19,7 +19,7 @@ import {
   PanelRightOpen,
   Send,
   Upload,
-  Sparkles,
+  Trash2,
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
@@ -47,7 +47,7 @@ function DocxViewer({ file }: { file: File }) {
     const renderDocx = async () => {
       try {
         await docx.renderAsync(file, containerRef.current!, undefined, {
-          className: "docx-preview-wrapper",
+          className: "docx-wrapper",
           inWrapper: true,
           ignoreWidth: false,
           ignoreHeight: false,
@@ -105,11 +105,11 @@ function DocxViewer({ file }: { file: File }) {
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full pb-4">
       <div
         ref={containerRef}
         onMouseUp={handleSelection}
-        className="docx-viewer-container w-full overflow-hidden rounded-[12px] bg-white text-black [&_.docx-preview-wrapper]:!bg-white [&_.docx-preview-wrapper]:!p-8 [&_section]:!shadow-none [&_section]:!bg-white [&_section]:!min-h-0 [&_section]:!h-auto"
+        className="docx-viewer-container w-full overflow-hidden rounded-[12px] bg-white text-black [&_.docx-wrapper]:!bg-white [&_.docx-wrapper]:!p-4 [&_section]:!shadow-none [&_section]:!bg-white [&_section]:!min-h-0 [&_section]:!h-auto"
       />
       
       <AnimatePresence>
@@ -363,6 +363,30 @@ export function Dashboard() {
     [buildUploadedPreview, uploadFiles],
   );
 
+  const handleDeleteFile = useCallback(
+    (id: string, event: React.MouseEvent) => {
+      event.stopPropagation(); // Prevent selecting the file when clicking delete
+      
+      setUploadedDocuments((current) => {
+        const next = current.filter(doc => doc.id !== id);
+        
+        // If we deleted the currently selected file, select the first available one
+        if (selectedDocumentId === id) {
+          if (next.length > 0) {
+            setSelectedDocumentId(next[0].id);
+          } else if (documents.length > 0) {
+            setSelectedDocumentId(documents[0].id);
+          } else {
+            setSelectedDocumentId("");
+          }
+        }
+        
+        return next;
+      });
+    },
+    [selectedDocumentId, documents.length]
+  );
+
   const activeUploadedDocument =
     uploadedDocuments.find((document) => document.id === selectedDocumentId) ?? null;
   const activeDocument = documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null;
@@ -587,12 +611,13 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="min-h-0 flex-1 overflow-hidden flex flex-col relative">
             {activeUploadedDocument ? (
-              <div className="min-h-full p-3">
-                <div className="rounded-[18px] border border-white/10 bg-black/18 p-3">
-                  <div className="rounded-[16px] border border-orange-300/14 bg-orange-500/10 p-4">
-                    {activeUploadedDocument.kind === "pdf" && activeUploadedDocument.objectUrl ? (
+              <div className="absolute inset-0 p-3 flex flex-col">
+                <div className="flex-1 min-h-0 rounded-[18px] border border-white/10 bg-black/18 p-3 flex flex-col">
+                  <div className="flex-1 min-h-0 rounded-[16px] border border-orange-300/14 bg-orange-500/10 flex flex-col overflow-hidden p-4">
+                    <div className="flex-1 min-h-0 overflow-y-auto rounded-[12px] bg-white">
+                      {activeUploadedDocument.kind === "pdf" && activeUploadedDocument.objectUrl ? (
                       <iframe
                         title={activeUploadedDocument.fileName}
                         src={activeUploadedDocument.objectUrl}
@@ -619,6 +644,7 @@ export function Dashboard() {
                         Preview is not available for this file type yet.
                       </div>
                     ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
