@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-04-12T23:54:56.193052+00:00",
+  "document_count": 6,
+  "documents": [
+    {
+      "source_file": "Series A - A&R Investors' Rights Agreement.docx",
+      "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "series_a_a_r_investors_rights_agreement.json"
+    },
+    {
+      "source_file": "Series A - A&R Investors' Rights Agreement_1.docx",
+      "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "series_a_a_r_investors_rights_agreement_1.json"
+    },
+    {
+      "source_file": "Series A - A&R Investors' Rights Agreement_2.docx",
+      "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "series_a_a_r_investors_rights_agreement_2.json"
+    },
+    {
+      "source_file": "Series A A&R Right of First Refusal and Co-Sale Agreement .docx",
+      "document_title": "AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "series_a_a_r_right_of_first_refusal_and_co_sale_agreement.json"
+    },
+    {
+      "source_file": "Series A A&R Voting Agreement.docx",
+      "document_title": "AMENDED AND RESTATED VOTING AGREEMENT",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "series_a_a_r_voting_agreement.json"
+    },
+    {
+      "source_file": "Series A Stock Purchase Agreement .docx",
+      "document_title": "SERIES A PREFERRED STOCK PURCHASE AGREEMENT",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "series_a_stock_purchase_agreement.json"
+    }
+  ]
+}

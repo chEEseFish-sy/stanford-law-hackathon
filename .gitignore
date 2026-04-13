@@ -13,6 +13,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+__pycache__/
+*.py[cod]
+.venv/
+*.tsbuildinfo
+processed_data/*.sqlite3
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
 .env
 .env.*
 

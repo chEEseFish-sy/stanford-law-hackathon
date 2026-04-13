@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Background,
@@ -9,8 +9,11 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+<<<<<<< HEAD
 import JSZip from "jszip";
 import * as docx from "docx-preview";
+=======
+>>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
 import {
   ArrowUpRight,
   GitBranchPlus,
@@ -18,11 +21,16 @@ import {
   MessageSquare,
   PanelRightOpen,
   Send,
+<<<<<<< HEAD
   Upload,
+=======
+  Sparkles,
+>>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
 
+<<<<<<< HEAD
 interface UploadedPreviewDocument {
   id: string;
   fileName: string;
@@ -137,6 +145,8 @@ function DocxViewer({ file }: { file: File }) {
   );
 }
 
+=======
+>>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
 export function Dashboard() {
   const { snapshot, setViewingVersion } = useWorkbench();
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
@@ -152,16 +162,19 @@ export function Dashboard() {
     (version) => version.topologyNodeId === snapshot.topology.currentViewingNodeId,
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
+<<<<<<< HEAD
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
   const [leftPaneWidth, setLeftPaneWidth] = useState(260);
   const [rightPaneWidth, setRightPaneWidth] = useState(280);
+=======
+  const [leftPaneWidth, setLeftPaneWidth] = useState(320);
+  const [rightPaneWidth, setRightPaneWidth] = useState(340);
+>>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
   const [historyPaneHeight, setHistoryPaneHeight] = useState(220);
   const [resizeMode, setResizeMode] = useState<"left" | "right" | "history" | null>(null);
   const [topologyOpen, setTopologyOpen] = useState(false);
-  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const rightPaneRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const documentItems = useMemo(
     () => [
