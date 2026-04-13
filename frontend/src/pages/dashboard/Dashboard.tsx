@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Background,
@@ -9,11 +9,8 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-<<<<<<< HEAD
 import JSZip from "jszip";
 import * as docx from "docx-preview";
-=======
->>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
 import {
   ArrowUpRight,
   GitBranchPlus,
@@ -21,16 +18,12 @@ import {
   MessageSquare,
   PanelRightOpen,
   Send,
-<<<<<<< HEAD
   Upload,
-=======
   Sparkles,
->>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
 
-<<<<<<< HEAD
 interface UploadedPreviewDocument {
   id: string;
   fileName: string;
@@ -145,10 +138,8 @@ function DocxViewer({ file }: { file: File }) {
   );
 }
 
-=======
->>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
 export function Dashboard() {
-  const { snapshot, setViewingVersion } = useWorkbench();
+  const { snapshot, setViewingVersion, uploadFiles } = useWorkbench();
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
   const comparisons = useMemo(() => snapshot?.documentComparisons ?? [], [snapshot]);
   const previews = useMemo(() => snapshot?.documentPreviews ?? [], [snapshot]);
@@ -162,19 +153,18 @@ export function Dashboard() {
     (version) => version.topologyNodeId === snapshot.topology.currentViewingNodeId,
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
-<<<<<<< HEAD
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
   const [leftPaneWidth, setLeftPaneWidth] = useState(260);
   const [rightPaneWidth, setRightPaneWidth] = useState(280);
-=======
-  const [leftPaneWidth, setLeftPaneWidth] = useState(320);
-  const [rightPaneWidth, setRightPaneWidth] = useState(340);
->>>>>>> d6217bb02c26cbeca1dceb7b3e0d6972b6b514ad
   const [historyPaneHeight, setHistoryPaneHeight] = useState(220);
   const [resizeMode, setResizeMode] = useState<"left" | "right" | "history" | null>(null);
   const [topologyOpen, setTopologyOpen] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const rightPaneRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const documentItems = useMemo(
     () => [
@@ -351,12 +341,26 @@ export function Dashboard() {
         return;
       }
 
-      const nextDocuments = await Promise.all(files.map((file) => buildUploadedPreview(file)));
-      setUploadedDocuments((current) => [...nextDocuments, ...current]);
-      setSelectedDocumentId(nextDocuments[0].id);
-      setIsDraggingFiles(false);
+      setIsUploading(true);
+      setUploadFeedback("Uploading files to VeriCap...");
+
+      try {
+        const nextDocuments = await Promise.all(files.map((file) => buildUploadedPreview(file)));
+        setUploadedDocuments((current) => [...nextDocuments, ...current]);
+        setSelectedDocumentId(nextDocuments[0].id);
+        setIsDraggingFiles(false);
+        
+        await uploadFiles(files);
+        setUploadFeedback(`Successfully uploaded ${files.length} file(s).`);
+      } catch (error) {
+        setUploadFeedback("Failed to upload files.");
+        console.error(error);
+      } finally {
+        setIsUploading(false);
+        setTimeout(() => setUploadFeedback(null), 3000);
+      }
     },
-    [buildUploadedPreview],
+    [buildUploadedPreview, uploadFiles],
   );
 
   const activeUploadedDocument =
@@ -454,11 +458,11 @@ export function Dashboard() {
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="h-full"
+      className="h-full w-full"
     >
       <div
         ref={workspaceRef}
-        className="flex h-full overflow-hidden rounded-[24px] border border-white/10 bg-black/25 shadow-[0_24px_64px_rgba(0,0,0,0.34)] backdrop-blur-xl"
+        className="flex h-full w-full overflow-hidden bg-[#0A0A0A]"
       >
         <section
           className="flex h-full min-w-0 flex-col border-r border-white/10 bg-white/[0.04]"
@@ -562,10 +566,16 @@ export function Dashboard() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white transition hover:bg-white/[0.08] active:scale-95"
+                disabled={isUploading}
+                className={cn(
+                  "flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
+                  isUploading
+                    ? "border-white/5 bg-white/[0.02] text-white/30 cursor-not-allowed"
+                    : "border-white/10 bg-white/[0.05] text-white hover:bg-white/[0.08] active:scale-95"
+                )}
               >
-                <Upload className="h-4 w-4 text-orange-200" />
-                Upload
+                <Upload className={cn("h-4 w-4", isUploading ? "text-white/20" : "text-orange-200")} />
+                {isUploading ? "Uploading..." : "Upload"}
               </button>
               <button
                 onClick={() => setTopologyOpen(true)}
