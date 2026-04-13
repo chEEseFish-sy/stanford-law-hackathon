@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Background,
@@ -9,7 +9,6 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import JSZip from "jszip";
 import {
   ArrowUpRight,
   GitBranchPlus,
@@ -18,20 +17,9 @@ import {
   PanelRightOpen,
   Send,
   Sparkles,
-  Upload,
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
-
-interface UploadedPreviewDocument {
-  id: string;
-  fileName: string;
-  kind: "text" | "docx" | "pdf" | "image" | "unsupported";
-  content: string;
-  objectUrl?: string;
-  uploadedAt: string;
-  summary: string;
-}
 
 export function Dashboard() {
   const { snapshot, setViewingVersion } = useWorkbench();
@@ -48,16 +36,13 @@ export function Dashboard() {
     (version) => version.topologyNodeId === snapshot.topology.currentViewingNodeId,
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
-  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
   const [leftPaneWidth, setLeftPaneWidth] = useState(320);
   const [rightPaneWidth, setRightPaneWidth] = useState(340);
   const [historyPaneHeight, setHistoryPaneHeight] = useState(220);
   const [resizeMode, setResizeMode] = useState<"left" | "right" | "history" | null>(null);
   const [topologyOpen, setTopologyOpen] = useState(false);
-  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const rightPaneRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!selectedDocumentId && documents[0]) {
