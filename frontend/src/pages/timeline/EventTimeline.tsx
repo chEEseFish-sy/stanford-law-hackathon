@@ -1,45 +1,36 @@
-import React from "react";
 import { motion } from "framer-motion";
 import { FileText, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
+import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
 
-export function EventTimeline() {
-  const events = [
-    {
-      id: 1,
-      date: "Jan 15, 2022",
-      title: "Company Incorporation",
-      description: "Founder shares issued to Alice and Bob (4M shares each).",
-      status: "confirmed",
-      documents: ["Founder_Stock_Purchase_Alice.pdf", "Founder_Stock_Purchase_Bob.pdf"]
-    },
-    {
-      id: 2,
-      date: "Jun 01, 2022",
-      title: "Pre-seed SAFE Round",
-      description: "Raised $500k via post-money SAFE at $5M valuation cap.",
-      status: "confirmed",
-      documents: ["SAFE_Agreement_SeedVC.pdf"]
-    },
-    {
-      id: 3,
-      date: "Mar 10, 2023",
-      title: "Option Pool Creation",
-      description: "Board approved 10% option pool for early employees.",
-      status: "needs_review",
-      conflict: "Missing Board Consent document.",
-      documents: []
-    },
-    {
-      id: 4,
-      date: "Jun 15, 2023",
-      title: "Seed Priced Round",
-      description: "Raised $2M at $10M pre-money. SAFE converted to Seed Preferred.",
-      status: "needs_review",
-      conflict: "Missing Stockholder Consent for priced round approval.",
-      documents: ["Stock_Purchase_Agreement_VC.pdf", "Board_Consent_Seed_Round.pdf"]
-    }
-  ];
+export function EventTimeline({
+  setActiveTab,
+}: {
+  setActiveTab: (tab: "dashboard" | "documents" | "evidence" | "timeline" | "captable" | "topology") => void;
+}) {
+  const { snapshot } = useWorkbench();
+  const events =
+    snapshot?.topology.nodes
+      .filter((node) => node.nodeType !== "analysis_result")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((node) => {
+        const document = snapshot.documents.find((entry) => entry.id === node.entityId);
+        const result = snapshot.structuredResults.find((entry) => entry.documentId === node.entityId);
+
+        return {
+          id: node.id,
+          date: (document?.transactionDate ?? node.createdAt).slice(0, 10),
+          title: node.label,
+          description:
+            document?.summary ??
+            result?.captableImpactSummary ??
+            snapshot.captableVersions.find((version) => version.id === node.entityId)?.summary ??
+            "Topology event",
+          status: node.status === "trunk" || node.status === "merged" ? "confirmed" : "needs_review",
+          conflict: result?.evidenceFindings.find((finding) => finding.issue)?.issue,
+          documents: document ? [document.fileName] : [],
+        };
+      }) ?? [];
 
   return (
     <motion.div 
@@ -47,13 +38,16 @@ export function EventTimeline() {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto py-8"
     >
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div className="bg-white/80 rounded-[28px] shadow-sm border border-white/80 p-8 backdrop-blur">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Event Timeline</h3>
             <p className="text-sm text-slate-500 mt-1">Chronological reconstruction of cap table events.</p>
           </div>
-          <button className="px-4 py-2 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("topology")}
+            className="px-4 py-2 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors shadow-sm flex items-center gap-2"
+          >
             Switch to Topology View <ArrowRight className="w-4 h-4" />
           </button>
         </div>

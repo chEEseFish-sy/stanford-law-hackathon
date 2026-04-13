@@ -1,170 +1,264 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Check, X, Info, FileText, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  FileText,
+  Info,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
 
 export function EvidenceReview() {
-  const [selectedIssue, setSelectedIssue] = useState<number | null>(1);
-
-  const issues = [
-    {
-      id: 1,
-      title: "Missing Stockholder Consent",
-      severity: "high",
-      description: "Priced Round Approval is missing required stockholder consent signatures.",
-      files: ["Board_Consent_Seed_Round.pdf"],
-      date: "Jun 01, 2023",
-      status: "pending"
-    },
-    {
-      id: 2,
-      title: "Valuation Cap Mismatch",
-      severity: "medium",
-      description: "SAFE Note valuation cap is stated as $5M in SPA but $6M in Cap Table draft.",
-      files: ["SAFE_Agreement_Alice.pdf", "Cap_Table_Draft_vFinal.xlsx"],
-      date: "Jan 15, 2023",
-      status: "pending"
-    },
-    {
-      id: 3,
-      title: "Unrecorded Option Pool Increase",
-      severity: "low",
-      description: "Board approved 10% option pool increase not reflected in the working cap table.",
-      files: ["Board_Consent_Seed_Round.pdf"],
-      date: "Jun 01, 2023",
-      status: "resolved"
+  const { snapshot } = useWorkbench();
+  const issues = useMemo(
+    () =>
+      (snapshot?.structuredResults ?? [])
+        .flatMap((result) =>
+          result.evidenceFindings
+            .filter((finding) => finding.issue)
+            .map((finding, index) => ({
+              id: `${result.id}-${index}`,
+              title: finding.field.replace(/_/g, " "),
+              severity:
+                finding.confidence > 0.94 ? "medium" : finding.confidence > 0.9 ? "high" : "low",
+              description: finding.issue!,
+              files: (snapshot?.documents ?? [])
+                .filter((document) => document.id === result.documentId)
+                .map((document) => document.fileName),
+              date: result.effectiveDate ?? result.createdAt.slice(0, 10),
+              status: "pending",
+              explanation: result.aiExplanation,
+              impact: result.captableImpactSummary,
+              source: finding.source,
+              confidence: `${Math.round(finding.confidence * 100)}%`,
+              documentId: result.documentId,
+            })),
+        ),
+    [snapshot],
+  );
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedIssue && issues[0]) {
+      setSelectedIssue(issues[0].id);
     }
-  ];
+  }, [issues, selectedIssue]);
+  const currentIssue = issues.find((issue) => issue.id === selectedIssue) ?? issues[0] ?? null;
+  const currentPreview =
+    snapshot?.documentPreviews.find((preview) => preview.documentId === currentIssue?.documentId) ?? null;
+  const currentComparison =
+    snapshot?.documentComparisons.find((comparison) => comparison.currentDocumentId === currentIssue?.documentId) ??
+    snapshot?.documentComparisons[0] ??
+    null;
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex gap-6 h-[calc(100vh-8rem)]"
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="grid gap-6 xl:grid-cols-[0.8fr,1.1fr]"
     >
-      <div className="w-1/2 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-900">Review Queue</h3>
-          <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm">
-            {issues.filter(i => i.status === 'pending').length} Pending
+      <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.05] backdrop-blur-xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.26em] text-white/35">Step 2</div>
+            <h3 className="mt-2 text-xl font-semibold text-white">Evidence review queue</h3>
+          </div>
+          <span className="rounded-full border border-orange-300/20 bg-orange-500/10 px-3 py-1 text-sm font-medium text-orange-100/85">
+            {issues.length} pending
           </span>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+        <div className="space-y-4 p-4">
           {issues.map((issue) => (
-            <motion.div
-              layoutId={`issue-${issue.id}`}
+            <button
               key={issue.id}
               onClick={() => setSelectedIssue(issue.id)}
               className={cn(
-                "p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 relative group",
-                selectedIssue === issue.id 
-                  ? "border-indigo-500 bg-indigo-50/30 shadow-md ring-4 ring-indigo-50" 
-                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50 shadow-sm"
+                "group w-full rounded-[24px] border p-5 text-left transition duration-200",
+                selectedIssue === issue.id
+                  ? "border-orange-300/35 bg-orange-500/10"
+                  : "border-white/8 bg-black/18 hover:border-white/14 hover:bg-white/[0.05]",
               )}
             >
               <div className="flex items-start gap-4">
                 <div className={cn(
-                  "p-2.5 rounded-lg shrink-0",
-                  issue.severity === 'high' ? "bg-red-100 text-red-600" :
-                  issue.severity === 'medium' ? "bg-amber-100 text-amber-600" :
-                  "bg-blue-100 text-blue-600"
+                  "rounded-2xl p-3 shrink-0",
+                  issue.severity === "high"
+                    ? "bg-rose-500/14 text-rose-200"
+                    : issue.severity === "medium"
+                      ? "bg-amber-500/14 text-amber-200"
+                      : "bg-white/8 text-white/75",
                 )}>
-                  <AlertTriangle className="w-5 h-5" />
+                  <AlertTriangle className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h4 className="text-base font-bold text-slate-900 truncate pr-4">{issue.title}</h4>
-                    {issue.status === 'resolved' && (
-                      <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0">Resolved</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">{issue.description}</p>
-                  
-                  <div className="mt-4 flex items-center gap-4 text-xs font-medium text-slate-500">
-                    <span className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-md">
-                      <FileText className="w-3.5 h-3.5" />
-                      {issue.files.length} File{issue.files.length > 1 ? 's' : ''}
+                  <div className="flex items-center justify-between gap-4">
+                    <h4 className="truncate pr-4 text-base font-semibold text-white">{issue.title}</h4>
+                    <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white/52">
+                      {issue.confidence}
                     </span>
-                    <span className="text-slate-400">{issue.date}</span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/58">{issue.description}</p>
+                  <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-medium text-white/45">
+                    <span className="flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1">
+                      <FileText className="h-3.5 w-3.5" />
+                      {issue.files[0]}
+                    </span>
+                    <span>{issue.date}</span>
                   </div>
                 </div>
                 <ChevronRight className={cn(
-                  "w-5 h-5 transition-transform duration-200 shrink-0",
-                  selectedIssue === issue.id ? "text-indigo-500 translate-x-1" : "text-slate-300 group-hover:text-slate-400"
+                  "h-5 w-5 shrink-0 transition duration-200",
+                  selectedIssue === issue.id
+                    ? "translate-x-1 text-orange-100"
+                    : "text-white/25 group-hover:text-white/55",
                 )} />
               </div>
-            </motion.div>
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="w-1/2 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
-        <AnimatePresence mode="wait">
-          {selectedIssue ? (
-            <motion.div
-              key={selectedIssue}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col h-full"
-            >
-              <div className="p-8 border-b border-slate-200">
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">
-                  {issues.find(i => i.id === selectedIssue)?.title}
-                </h3>
-                <p className="text-slate-600 leading-relaxed">
-                  {issues.find(i => i.id === selectedIssue)?.description}
-                </p>
+      <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.05] backdrop-blur-xl">
+        {currentIssue ? (
+          <motion.div
+            key={selectedIssue}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="border-b border-white/10 px-8 py-7">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.26em] text-orange-200/70">Client decision loop</div>
+                  <h3 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white">
+                    {currentIssue.title}
+                  </h3>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-white/58">
+                    {currentIssue.description}
+                  </p>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-white/72">
+                  Source: {currentIssue.source}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 p-8 xl:grid-cols-[1fr,0.95fr]">
+              <div className="space-y-6">
+                <div className="rounded-[28px] border border-white/10 bg-black/18 p-6">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <FileText className="h-4 w-4 text-orange-200" />
+                    {currentIssue.files[0]}
+                  </div>
+                  <p className="mt-4 text-sm leading-7 text-white/68">
+                    {currentPreview?.excerpt.split(currentPreview.highlightedPhrases[0]?.text ?? "").length === 2 ? (
+                      <>
+                        {currentPreview.excerpt.split(currentPreview.highlightedPhrases[0].text)[0]}
+                        <span className="rounded-lg bg-orange-400/18 px-1 py-0.5 text-white">
+                          {currentPreview.highlightedPhrases[0].text}
+                        </span>
+                        {currentPreview.excerpt.split(currentPreview.highlightedPhrases[0].text)[1]}
+                      </>
+                    ) : (
+                      currentPreview?.excerpt ?? currentIssue.description
+                    )}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {(currentPreview?.highlightedPhrases ?? []).map((phrase) => (
+                      <span
+                        key={`${phrase.sourceLabel}-${phrase.text}`}
+                        className={cn(
+                          "rounded-full border px-3 py-1 text-xs",
+                          phrase.tone === "good"
+                            ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-100"
+                            : phrase.tone === "bad"
+                              ? "border-amber-300/25 bg-amber-500/10 text-amber-100"
+                              : "border-white/10 bg-white/[0.06] text-white/70",
+                        )}
+                      >
+                        {phrase.sourceLabel}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-white/10 bg-black/18 p-6">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <Info className="h-4 w-4 text-orange-200" />
+                    AI explanation
+                  </div>
+                  <p className="mt-4 text-sm leading-7 text-white/62">{currentIssue.explanation}</p>
+                  <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.04] p-4 text-sm text-white/58">
+                    {currentIssue.impact}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-slate-50">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Evidence Sources</h4>
-                  <div className="space-y-3">
-                    {issues.find(i => i.id === selectedIssue)?.files.map((file, idx) => (
-                      <div key={idx} className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group">
-                        <div className="bg-slate-100 p-2 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                          <FileText className="w-5 h-5 text-slate-500 group-hover:text-indigo-600" />
+              <div className="space-y-6">
+                <div className="rounded-[28px] border border-white/10 bg-black/18 p-6">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <Sparkles className="h-4 w-4 text-orange-200" />
+                    Previous vs current
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {(currentComparison?.changes ?? []).map((change) => (
+                      <div key={change.label} className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="text-sm font-semibold text-white">{change.label}</div>
+                          <span
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
+                              change.recommendation === "accept"
+                                ? "bg-emerald-500/12 text-emerald-100"
+                                : change.recommendation === "reject"
+                                  ? "bg-rose-500/12 text-rose-100"
+                                  : "bg-amber-500/12 text-amber-100",
+                            )}
+                          >
+                            {change.recommendation}
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">{file}</span>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-2xl border border-white/8 bg-black/20 p-3">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Previous</div>
+                            <div className="mt-2 text-sm text-white/62">{change.previousText}</div>
+                          </div>
+                          <div className="rounded-2xl border border-white/8 bg-black/20 p-3">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Current</div>
+                            <div className="mt-2 text-sm text-white/84">{change.currentText}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 text-xs text-white/42">{change.sourceLabel}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Info className="w-5 h-5 text-indigo-600" />
-                    <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-wider">AI Explanation</h4>
-                  </div>
-                  <p className="text-sm text-indigo-800 leading-relaxed mb-4">
-                    The system detected that while the Board Consent was signed, the corresponding Stockholder Consent document is missing from the uploaded package. This is required for a priced round approval under Delaware law.
-                  </p>
-                  <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Suggested Action</span>
-                    <span className="text-sm font-medium text-slate-700">Request the signed Stockholder Consent document from the client to verify the approval chain.</span>
-                  </div>
+                <div className="flex gap-3">
+                  <button className="flex-1 rounded-[20px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/80 transition hover:bg-white/[0.08]">
+                    <X className="mr-2 inline h-4 w-4" />
+                    Hold for client
+                  </button>
+                  <button className="flex-1 rounded-[20px] border border-orange-300/30 bg-orange-500/12 px-4 py-3 text-sm font-medium text-white transition hover:bg-orange-500/18">
+                    <Check className="mr-2 inline h-4 w-4" />
+                    Accept latest change
+                  </button>
                 </div>
               </div>
-
-              <div className="p-6 border-t border-slate-200 bg-white flex gap-4">
-                <button className="flex-1 bg-white border-2 border-slate-200 text-slate-700 px-4 py-3 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 transition-colors flex items-center justify-center gap-2">
-                  <X className="w-5 h-5" /> Exclude
-                </button>
-                <button className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-sm hover:shadow flex items-center justify-center gap-2">
-                  <Check className="w-5 h-5" /> Accept Suggestion
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-              <AlertCircle className="w-12 h-12 mb-4 text-slate-300" />
-              <p className="text-lg font-medium">Select an issue to review evidence</p>
             </div>
-          )}
-        </AnimatePresence>
+          </motion.div>
+        ) : (
+          <div className="flex min-h-[420px] flex-col items-center justify-center text-white/42">
+            <AlertCircle className="h-12 w-12 text-white/20" />
+            <p className="mt-4 text-lg font-medium">Select an issue to review the source evidence.</p>
+          </div>
+        )}
       </div>
     </motion.div>
   );
