@@ -1,36 +1,38 @@
 import type { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
+import { useWorkbench } from "../../context/WorkbenchContext";
 
 interface AppLayoutProps {
   children: ReactNode;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
 }
 
-export function AppLayout({ children, activeTab, setActiveTab }: AppLayoutProps) {
+export function AppLayout({ children }: AppLayoutProps) {
+  const { snapshot } = useWorkbench();
+
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
-      <main className="flex-1 ml-64 flex flex-col h-full relative z-0">
-        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10 flex items-center px-8 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-800 capitalize tracking-tight">
-            {activeTab.replace(/([A-Z])/g, ' $1').trim()}
-          </h2>
-          <div className="ml-auto flex items-center gap-4">
-            <span className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-              Acme Corp Seed Round
-            </span>
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center border-2 border-indigo-500 text-indigo-700 font-bold shadow-sm">
-              AC
+    <div className="relative h-screen overflow-hidden bg-[#050505] font-sans text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,141,35,0.28),_transparent_24%),radial-gradient(circle_at_80%_20%,_rgba(255,98,0,0.22),_transparent_18%),radial-gradient(circle_at_50%_100%,_rgba(255,176,96,0.12),_transparent_26%),linear-gradient(180deg,_#090909_0%,_#111111_46%,_#0a0a0a_100%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:72px_72px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_40%,_rgba(0,0,0,0.58)_100%)]" />
+      <main className="relative z-10 flex h-screen flex-col overflow-hidden">
+        <header className="z-10 shrink-0 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur-2xl">
+          <div className="mx-auto flex max-w-[1600px] items-center gap-3">
+            <div className="flex-1">
+              <div className="text-[11px] uppercase tracking-[0.32em] text-orange-200/70">VeriCap</div>
+              <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
+                Evidence workspace
+              </h1>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/65">
+              {snapshot?.workspace.caseName ?? "Loading matter"}
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/65">
+              Viewing {snapshot?.topology.currentViewingNodeId ?? "Loading"}
             </div>
           </div>
         </header>
-        
-        <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+
+        <div className="min-h-0 flex-1 overflow-hidden px-3 py-3">
+          <div className="mx-auto h-full max-w-[1600px]">{children}</div>
         </div>
       </main>
     </div>
