@@ -864,24 +864,26 @@ export function Dashboard() {
             </div>
             <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 pb-3">
               {documentItems.map((document) => (
-                <button
+                <div
                   key={document.id}
-                  onClick={() => setSelectedDocumentId(document.id)}
                   className={cn(
-                    "w-full rounded-[16px] border px-3 py-2.5 text-left transition duration-200",
+                    "group relative w-full rounded-[16px] border transition duration-200",
                     selectedDocumentId === document.id
                       ? "border-orange-300/32 bg-orange-500/12"
                       : "border-white/8 bg-black/18 hover:bg-white/[0.05]",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                  <button
+                    onClick={() => setSelectedDocumentId(document.id)}
+                    className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left"
+                  >
+                    <div className="min-w-0 pr-6">
                       <div className="truncate text-sm font-semibold text-white">{document.fileName}</div>
                       <div className="mt-1 text-xs text-white/40">{document.uploadedAt}</div>
                     </div>
                     <span
                       className={cn(
-                        "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
+                        "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shrink-0",
                         document.evidenceStatus === "verified"
                           ? "bg-emerald-500/12 text-emerald-100"
                           : document.evidenceStatus === "conflict"
@@ -895,8 +897,15 @@ export function Dashboard() {
                     >
                       {document.evidenceStatus}
                     </span>
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteFile(document.id, e)}
+                    className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500/10 text-rose-400/70 opacity-0 backdrop-blur-md transition-all hover:bg-rose-500/20 hover:text-rose-400 group-hover:opacity-100"
+                    title="Delete file"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
