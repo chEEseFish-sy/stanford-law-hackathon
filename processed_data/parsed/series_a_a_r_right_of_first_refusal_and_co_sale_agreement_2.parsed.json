@@ -1,0 +1,668 @@
+{
+  "source_file": "Series A A&R Right of First Refusal and Co-Sale Agreement _2.docx",
+  "document_title": "AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT",
+  "paragraph_count": 128,
+  "character_count": 47914,
+  "chunks": [
+    {
+      "chunk_id": 0,
+      "start_paragraph_id": 0,
+      "end_paragraph_id": 38,
+      "character_count": 17692
+    },
+    {
+      "chunk_id": 1,
+      "start_paragraph_id": 39,
+      "end_paragraph_id": 64,
+      "character_count": 17740
+    },
+    {
+      "chunk_id": 2,
+      "start_paragraph_id": 65,
+      "end_paragraph_id": 127,
+      "character_count": 16849
+    }
+  ],
+  "paragraphs": [
+    {
+      "paragraph_id": 0,
+      "type": "paragraph",
+      "text": "AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT"
+    },
+    {
+      "paragraph_id": 1,
+      "type": "paragraph",
+      "text": "THIS AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT (this “Agreement”), is made as of [●], 2025 by and among A Inc., a Delaware corporation (the “Company”), the Investors (as defined below) listed on Schedule A and the Key Holders (as defined below) listed on Schedule B."
+    },
+    {
+      "paragraph_id": 2,
+      "type": "paragraph",
+      "text": "WHEREAS, each Key Holder is the beneficial owner of shares of Capital Stock, or of options to purchase Common Stock;"
+    },
+    {
+      "paragraph_id": 3,
+      "type": "paragraph",
+      "text": "WHEREAS, the Company, the Key Holders (the “Existing Key Holders”) and certain of the Investors (the “Existing Investors”) previously entered into an Amended and Restated Right of First Refusal and Co-Sale Agreement, dated ·, 2025 (the “Prior Agreement”), in connection with the purchase of shares of Series Seed Preferred Stock of the Company, par value $0.0001 per share (“Series Seed Preferred Stock”) and Series Seed-1 Preferred Stock of the Company, par value $0.0001 per share (“Series Seed-1 Preferred Stock”); and"
+    },
+    {
+      "paragraph_id": 4,
+      "type": "paragraph",
+      "text": "WHEREAS, the Key Holders, the Existing Investors and the Company desire to induce certain of the Investors to purchase shares of Series A-1 Preferred Stock of the Company, par value $0.0001 per share (“Series A-1 Preferred Stock”), Series A-2 Preferred Stock of the Company, par value $0.0001 per share (“Series A-2 Preferred Stock”), and Series A-3 Preferred Stock of the Company, par value $0.0001 per share (“Series A-3 Preferred Stock” and together with the Series A-1 Preferred Stock and Series A-2 Preferred Stock, the “Series A Preferred Stock”), pursuant to that certain Series A Preferred Stock Purchase Agreement dated as of the date hereof by and among the Company and such Investors (the “Purchase Agreement”) by amending and restating the Prior Agreement in its entirety and entering into this Agreement to provide the Investors with the rights and privileges as set forth herein."
+    },
+    {
+      "paragraph_id": 5,
+      "type": "paragraph",
+      "text": "NOW, THEREFORE, the Company, the Key Holders and the Investors agree as follows:"
+    },
+    {
+      "paragraph_id": 6,
+      "type": "paragraph",
+      "text": "Definitions."
+    },
+    {
+      "paragraph_id": 7,
+      "type": "paragraph",
+      "text": "“Affiliate” means, with respect to any specified Investor, any other Investor who directly or indirectly, controls, is controlled by or is under common control with such Investor, including, without limitation, any general partner, managing member, officer, director or trustee of such Investor, or any venture capital fund or other investment fund now or hereafter existing which is controlled by one (1) or more general partners, managing members or investment advisers of, or shares the same management company or investment adviser with, such Investor."
+    },
+    {
+      "paragraph_id": 8,
+      "type": "paragraph",
+      "text": "“Board of Directors” means the board of directors of the Company."
+    },
+    {
+      "paragraph_id": 9,
+      "type": "paragraph",
+      "text": "“Capital Stock” means (a) shares of Common Stock and Preferred Stock (whether now outstanding or hereafter issued in any context), (b) shares of Common Stock issued or issuable upon conversion of Preferred Stock, and (c) shares of Common Stock issued or issuable upon exercise or conversion, as applicable, of stock options, warrants or other convertible securities of the Company, in each case now owned or subsequently acquired by any Key Holder, any Investor, or their respective successors or permitted transferees or assigns. For purposes of the number of shares of Capital Stock held by an Investor or Key Holder (or any other calculation based thereon), all shares of Preferred Stock shall be deemed to have been converted into Common Stock at the then-applicable conversion ratio."
+    },
+    {
+      "paragraph_id": 10,
+      "type": "paragraph",
+      "text": "“Change of Control” means a transaction or series of related transactions in which a person, or a group of related persons, acquires from stockholders of the Company shares representing more than fifty percent (50%) of the outstanding voting power of the Company."
+    },
+    {
+      "paragraph_id": 11,
+      "type": "paragraph",
+      "text": "“Common Stock” means shares of Common Stock of the Company, $0.0001 par value per share."
+    },
+    {
+      "paragraph_id": 12,
+      "type": "paragraph",
+      "text": "“Company Notice” means written notice from the Company notifying the selling Key Holders and each Investor that the Company intends to exercise its Right of First Refusal as to some or all of the Transfer Stock with respect to any Proposed Key Holder Transfer."
+    },
+    {
+      "paragraph_id": 13,
+      "type": "paragraph",
+      "text": "“Investor Notice” means written notice from any Investor notifying the Company and the selling Key Holder(s) that such Investor intends to exercise its Secondary Refusal Right as to a portion of the Transfer Stock with respect to any Proposed Key Holder Transfer."
+    },
+    {
+      "paragraph_id": 14,
+      "type": "paragraph",
+      "text": "“Investors” means the persons named on Schedule A hereto, each person to whom the rights of an Investor are assigned pursuant to Section 6.9 and any one of them, as the context may require."
+    },
+    {
+      "paragraph_id": 15,
+      "type": "paragraph",
+      "text": "“Key Holders” means the persons named on Schedule B hereto, each person to whom the rights of a Key Holder are assigned pursuant to Section 3.1, each person who hereafter becomes a signatory to this Agreement pursuant to Section 6.9 or 6.16 and any one of them, as the context may require."
+    },
+    {
+      "paragraph_id": 16,
+      "type": "paragraph",
+      "text": "“Preferred Stock” means collectively, all shares of Series Seed Preferred Stock, Series Seed-1 Preferred Stock and Series A Preferred Stock."
+    },
+    {
+      "paragraph_id": 17,
+      "type": "paragraph",
+      "text": "“Proposed Key Holder Transfer” means any assignment, sale, offer to sell, pledge, mortgage, hypothecation, encumbrance, disposition of or any other like transfer or encumbering of any Transfer Stock (or any interest therein) proposed by any of the Key Holders."
+    },
+    {
+      "paragraph_id": 18,
+      "type": "paragraph",
+      "text": "“Proposed Transfer Notice” means written notice from a Key Holder setting forth the terms and conditions of a Proposed Key Holder Transfer."
+    },
+    {
+      "paragraph_id": 19,
+      "type": "paragraph",
+      "text": "“Prospective Transferee” means any person to whom a Key Holder proposes to make a Proposed Key Holder Transfer."
+    },
+    {
+      "paragraph_id": 20,
+      "type": "paragraph",
+      "text": "“Restated Certificate” means the Company’s Amended and Restated Certificate of Incorporation, as amended and/or restated from time to time."
+    },
+    {
+      "paragraph_id": 21,
+      "type": "paragraph",
+      "text": "“Right of Co-Sale” means the right, but not an obligation, of an Investor to participate in a Proposed Key Holder Transfer on the terms and conditions specified in the Proposed Transfer Notice."
+    },
+    {
+      "paragraph_id": 22,
+      "type": "paragraph",
+      "text": "“Right of First Refusal” means the right, but not an obligation, of the Company, or its permitted transferees or assigns, to purchase some or all of the Transfer Stock with respect to a Proposed Key Holder Transfer, on the terms and conditions specified in the Proposed Transfer Notice."
+    },
+    {
+      "paragraph_id": 23,
+      "type": "paragraph",
+      "text": "“Sanctioned Party” means any Person: (i) organized under the laws of, ordinarily resident in, or located in a country or territory that is the subject of comprehensive Sanctions (“Restricted Countries”); (ii) 50% or more owned or controlled by the government of a Restricted Country; or (iii) (A) designated on a sanctioned parties list administered by the United States, including, without limitation, the U.S. Department of the Treasury’s Office of Foreign Assets Control’s Specially Designated Nationals and Blocked Persons List, Foreign Sanctions Evaders List, and Sectoral Sanctions Identification List (collectively, “Designated Parties”); or (B) 50% or more owned or, where relevant under applicable Sanctions, controlled, individually or in the aggregate, by one or more Designated Party, in each case only to the extent that dealings with such Person is are prohibited pursuant to applicable Sanctions."
+    },
+    {
+      "paragraph_id": 24,
+      "type": "paragraph",
+      "text": "“Sanctions” means applicable laws and regulations pertaining to trade and economic sanctions administered by the United States."
+    },
+    {
+      "paragraph_id": 25,
+      "type": "paragraph",
+      "text": "“Secondary Notice” means written notice from the Company notifying the Investors and the selling Key Holder that the Company does not intend to exercise its Right of First Refusal as to all shares of any Transfer Stock with respect to a Proposed Key Holder Transfer, on the terms and conditions specified in the Proposed Transfer Notice."
+    },
+    {
+      "paragraph_id": 26,
+      "type": "paragraph",
+      "text": "“Secondary Refusal Right” means the right, but not an obligation, of each Investor to purchase up to its pro rata portion (based upon the total number of shares of Capital Stock then held by all Investors) of any Transfer Stock not purchased pursuant to the Right of First Refusal, on the terms and conditions specified in the Proposed Transfer Notice."
+    },
+    {
+      "paragraph_id": 27,
+      "type": "paragraph",
+      "text": "“Transfer Stock” means shares of Capital Stock owned by a Key Holder, or issued to a Key Holder (including, without limitation, in connection with any stock split, stock dividend, recapitalization, reorganization, or the like), but does not include any shares of Preferred Stock or of Common Stock that are issued or issuable upon conversion of Preferred Stock."
+    },
+    {
+      "paragraph_id": 28,
+      "type": "paragraph",
+      "text": "“Undersubscription Notice” means written notice from an Investor notifying the Company and the selling Key Holder that such Investor intends to exercise its option to purchase all or any portion of the Transfer Stock not purchased pursuant to the Right of First Refusal or the Secondary Refusal Right."
+    },
+    {
+      "paragraph_id": 29,
+      "type": "paragraph",
+      "text": "Agreement Among the Company, the Investors and the Key Holders."
+    },
+    {
+      "paragraph_id": 30,
+      "type": "paragraph",
+      "text": "Right of First Refusal."
+    },
+    {
+      "paragraph_id": 31,
+      "type": "paragraph",
+      "text": "Grant. Subject to the terms of Section 3 below, each Key Holder hereby unconditionally and irrevocably grants to the Company a Right of First Refusal to purchase all or any portion of Transfer Stock that such Key Holder may propose to transfer in a Proposed Key Holder Transfer, at the same price and on the same terms and conditions as those offered to the Prospective Transferee."
+    },
+    {
+      "paragraph_id": 32,
+      "type": "paragraph",
+      "text": "Notice. Each Key Holder proposing to make a Proposed Key Holder Transfer must deliver a Proposed Transfer Notice to the Company and each Investor not later than forty-five (45) days prior to the consummation of such Proposed Key Holder Transfer. Such Proposed Transfer Notice shall contain the material terms and conditions (including price and form of consideration) of the Proposed Key Holder Transfer, the identity of the Prospective Transferee and the intended date of the Proposed Key Holder Transfer. To exercise its Right of First Refusal under this Section 2, the Company must deliver a Company Notice to the selling Key Holder and the Investors within fifteen (15) days after delivery of the Proposed Transfer Notice specifying the number of shares of Transfer Stock to be purchased by the Company. In the event of a conflict between this Agreement and any other agreement that may have been entered into by a Key Holder with the Company that contains a preexisting right of first refusal, the Company and the Key Holder acknowledge and agree that the terms of this Agreement shall control and the preexisting right of first refusal shall be deemed satisfied by compliance with Section 2.1(a) and this Section 2.1(b). In the event of a conflict between this Agreement and the Company’s Bylaws containing a preexisting right of first refusal, the terms of the Bylaws will control and compliance with the Bylaws shall be deemed compliance with Section 2.1(a) and this Section 2.1(b) in full."
+    },
+    {
+      "paragraph_id": 33,
+      "type": "paragraph",
+      "text": "Grant of Secondary Refusal Right to the Investors. Subject to the terms of Section 3 below, each Key Holder hereby unconditionally and irrevocably grants to the Investors a Secondary Refusal Right to purchase all or any portion of the Transfer Stock not purchased by the Company pursuant to the Right of First Refusal, as provided in this Section 2.1(c). If the Company does not provide the Company Notice exercising its Right of First Refusal with respect to all Transfer Stock subject to a Proposed Key Holder Transfer, the Company must deliver a Secondary Notice to the selling Key Holder and to each Investor to that effect no later than fifteen (15) days after the selling Key Holder delivers the Proposed Transfer Notice to the Company. To exercise its Secondary Refusal Right, an Investor must deliver an Investor Notice to the selling Key Holder and the Company within ten (10) days after the Company’s deadline for its delivery of the Secondary Notice as provided in the preceding sentence."
+    },
+    {
+      "paragraph_id": 34,
+      "type": "paragraph",
+      "text": "Undersubscription of Transfer Stock. If options to purchase have been exercised by the Company and the Investors pursuant to Sections 2.1(b) and (c) with respect to some but not all of the Transfer Stock by the end of the ten (10) day period specified in the last sentence of Section 2.1(c) (the “Investor Notice Period”), then the Company shall, within five (5) days after the expiration of the Investor Notice Period, send written notice (the “Company Undersubscription Notice”) to those Investors who fully exercised their Secondary Refusal Right within the Investor Notice Period (the “Exercising Investors”). Each Exercising Investor shall, subject to the provisions of this Section 2.1(d), have an additional option to purchase all or any part of the balance of any such remaining unsubscribed shares of Transfer Stock on the terms and conditions set forth in the Proposed Transfer Notice. To exercise such option, an Exercising Investor must deliver an Undersubscription Notice to the selling Key Holder and the Company within ten (10) days after the expiration of the Investor Notice Period. In the event there are two (2) or more such Exercising Investors that choose to exercise the last-mentioned option for a total number of remaining shares in excess of the number available, the remaining shares available for purchase under this Section 2.1(d) shall be allocated to such Exercising Investors pro rata based on the number of shares of Transfer Stock such Exercising Investors have elected to purchase pursuant to the Secondary Refusal Right (without giving effect to any shares of Transfer Stock that any such Exercising Investor has elected to purchase pursuant to the Company Undersubscription Notice). If the options to purchase the remaining shares are exercised in full by the Exercising Investors, the Company shall immediately notify all of the Exercising Investors and the selling Key Holder of that fact."
+    },
+    {
+      "paragraph_id": 35,
+      "type": "paragraph",
+      "text": "Consideration; Closing. If the consideration proposed to be paid for the Transfer Stock is in property, services or other non-cash consideration, the fair market value of the consideration shall be as determined in good faith by the Board of Directors and as set forth in the Company Notice. If the Company or any Investor cannot for any reason pay for the Transfer Stock in the same form of non-cash consideration, the Company or such Investor may pay the cash value equivalent thereof, as determined in good faith by the Board of Directors and as set forth in the Company Notice. The closing of the purchase of Transfer Stock by the Company and the Investors shall take place, and all payments from the Company and the Investors shall have been delivered to the selling Key Holder, by the later of (i) the date specified in the Proposed Transfer Notice as the intended date of the Proposed Key Holder Transfer; and (ii) forty-five (45) days after delivery of the Proposed Transfer Notice."
+    },
+    {
+      "paragraph_id": 36,
+      "type": "paragraph",
+      "text": "Right of Co-Sale."
+    },
+    {
+      "paragraph_id": 37,
+      "type": "paragraph",
+      "text": "Exercise of Right. If any Transfer Stock subject to a Proposed Key Holder Transfer is not purchased pursuant to Section 2.1 above and thereafter is to be sold to a Prospective Transferee, each respective Investor may elect to exercise its Right of Co-Sale and participate on a pro rata basis in the Proposed Key Holder Transfer as set forth in Section 2.2(b) below and, subject to Section 2.2(d), otherwise on the same terms and conditions specified in the Proposed Transfer Notice. Each Investor who desires to exercise its Right of Co-Sale (each, a “Participating Investor”) must give the selling Key Holder written notice to that effect within fifteen (15) days after the deadline for delivery of the Secondary Notice described above, and upon giving such notice such Participating Investor shall be deemed to have effectively exercised the Right of Co-Sale."
+    },
+    {
+      "paragraph_id": 38,
+      "type": "paragraph",
+      "text": "Shares Includable. Each Participating Investor may include in the Proposed Key Holder Transfer all or any part of such Participating Investor’s Capital Stock equal to the product obtained by multiplying (i) the aggregate number of shares of Transfer Stock subject to the Proposed Key Holder Transfer (excluding shares purchased by the Company or the Participating Investors pursuant to the Right of First Refusal or the Secondary Refusal Right) by (ii) a fraction, the numerator of which is the number of shares of Capital Stock owned by such Participating Investor immediately before consummation of the Proposed Key Holder Transfer and the denominator of which is the total number of shares of Capital Stock owned, in the aggregate, by all Participating Investors immediately prior to the consummation of the Proposed Key Holder Transfer, plus the number of shares of Transfer Stock held by the selling Key Holders. To the extent one (1) or more of the Participating Investors exercise such right of participation in accordance with the terms and conditions set forth herein, the number of shares of Transfer Stock that the selling Key Holder may sell in the Proposed Key Holder Transfer shall be correspondingly reduced."
+    },
+    {
+      "paragraph_id": 39,
+      "type": "paragraph",
+      "text": "Purchase and Sale Agreement. The Participating Investors and the selling Key Holder agree that the terms and conditions of any Proposed Key Holder Transfer in accordance with this Section 2.2 will be memorialized in, and governed by, a written purchase and sale agreement with the Prospective Transferee (the “Purchase and Sale Agreement”) with customary terms and provisions for such a transaction, and the Participating Investors and the selling Key Holder further covenant and agree to enter into such Purchase and Sale Agreement as a condition precedent to any sale or other transfer in accordance with this Section 2.2."
+    },
+    {
+      "paragraph_id": 40,
+      "type": "paragraph",
+      "text": "Allocation of Consideration."
+    },
+    {
+      "paragraph_id": 41,
+      "type": "paragraph",
+      "text": "Subject to Section 2.2(d)(ii), the aggregate consideration payable to the Participating Investors and the selling Key Holder shall be allocated based on the number of shares of Capital Stock sold to the Prospective Transferee by each Participating Investor and the selling Key Holder as provided in Section 2.2(b), provided that if a Participating Investor wishes to sell Preferred Stock, the price set forth in the Proposed Transfer Notice shall be appropriately adjusted based on the conversion ratio of the Preferred Stock into Common Stock."
+    },
+    {
+      "paragraph_id": 42,
+      "type": "paragraph",
+      "text": "In the event that the Proposed Key Holder Transfer constitutes a Change of Control, the terms of the Purchase and Sale Agreement shall provide that the aggregate consideration from such transfer shall be allocated to the Participating Investors and the selling Key Holder in accordance with Sections 2.1 and 2.2 of Article IV(B) of the Restated Certificate and, if applicable, the next sentence as if (A) such transfer were a Deemed Liquidation Event (as defined in the Restated Certificate), and (B) the Capital Stock sold in accordance with the Purchase and Sale Agreement were the only Capital Stock outstanding. In the event that a portion of the aggregate consideration payable to the Participating Investor(s) and selling Key Holder is placed into escrow and/or is payable only upon satisfaction of contingencies (the “Additional Consideration”), the Purchase and Sale Agreement shall provide that (x) the portion of such consideration that is not placed in escrow and is not subject to contingencies (the “Initial Consideration”) shall be allocated in accordance with Sections 2.1 and 2.2 of Article IV(B) of the Restated Certificate as if the Initial Consideration were the only consideration payable in connection with such transfer, and (y) any additional consideration which becomes payable to the Participating Investor(s) and selling Key Holder upon release from escrow or satisfaction of such contingencies shall be allocated in accordance with Sections 2.1 and 2.2 of Article IV(B) of the Restated Certificate after taking into account the previous payment of the Initial Consideration as part of the same transfer. For the purposes of this Section 2.2(d)(ii), consideration placed into escrow or retained as a holdback to be available for satisfaction of indemnification or similar obligations in connection with such Change of Control shall be deemed to be Additional Consideration."
+    },
+    {
+      "paragraph_id": 43,
+      "type": "paragraph",
+      "text": "Purchase by Selling Key Holder; Deliveries. Notwithstanding Section 2.2(c) above, if any Prospective Transferee(s) refuse(s) to purchase securities subject to the Right of Co-Sale from any Participating Investor or Investors or upon the failure to negotiate in good faith a Purchase and Sale Agreement reasonably satisfactory to the Participating Investors, no Key Holder may sell any Transfer Stock to such Prospective Transferee(s) unless and until, simultaneously with such sale, such Key Holder purchases all securities subject to the Right of Co-Sale from such Participating Investor or Investors on the same terms and conditions (including the proposed purchase price) as set forth in the Proposed Transfer Notice and as provided in Section 2.2(d)(i); provided, however, if such sale constitutes a Change of Control, the portion of the aggregate consideration paid by the selling Key Holder to such Participating Investor or Investors shall be made in accordance with the first sentence of Section 2.2(d)(ii). In connection with such purchase by the selling Key Holder, such Participating Investor or Investors shall deliver to the selling Key Holder any stock certificate or certificates, properly endorsed for transfer, representing the Capital Stock being purchased by the selling Key Holder (or request that the Company effect such transfer in the name of the selling Key Holder). Any such shares transferred to the selling Key Holder will be transferred to the Prospective Transferee against payment therefor in consummation of the sale of the Transfer Stock pursuant to the terms and conditions specified in the Proposed Transfer Notice, and the selling Key Holder shall concurrently therewith remit or direct payment to each such Participating Investor the portion of the aggregate consideration to which each such Participating Investor is entitled by reason of its participation in such sale as provided in this Section 2.2(e)."
+    },
+    {
+      "paragraph_id": 44,
+      "type": "paragraph",
+      "text": "Additional Compliance. If any Proposed Key Holder Transfer is not consummated within sixty (60) days after receipt of the Proposed Transfer Notice by the Company, the Key Holders proposing the Proposed Key Holder Transfer may not sell any Transfer Stock unless they first comply in full with each provision of this Section 2. The exercise or election not to exercise any right by any Investor hereunder shall not adversely affect its right to participate in any other sales of Transfer Stock subject to this Section 2.2."
+    },
+    {
+      "paragraph_id": 45,
+      "type": "paragraph",
+      "text": "Effect of Failure to Comply."
+    },
+    {
+      "paragraph_id": 46,
+      "type": "paragraph",
+      "text": "Transfer Void; Equitable Relief. Any Proposed Key Holder Transfer not made in compliance with the requirements of this Agreement shall be null and void ab initio, shall not be recorded on the books of the Company or its transfer agent and shall not be recognized by the Company. Each party hereto acknowledges and agrees that any breach of this Agreement would result in substantial harm to the other parties hereto for which monetary damages alone could not adequately compensate. Therefore, the parties hereto unconditionally and irrevocably agree that any non-breaching party hereto shall be entitled to seek protective orders, injunctive relief and other remedies available at law or in equity (including, without limitation, seeking specific performance or the rescission of purchases, sales and other transfers of Transfer Stock not made in strict compliance with this Agreement)."
+    },
+    {
+      "paragraph_id": 47,
+      "type": "paragraph",
+      "text": "Violation of First Refusal Right. If any Key Holder becomes obligated to sell any Transfer Stock to the Company or any Investor under this Agreement and fails to deliver such Transfer Stock in accordance with the terms of this Agreement, the Company and/or such Investor may, at its option, in addition to all other remedies it may have, send to such Key Holder the purchase price for such Transfer Stock as is herein specified and transfer to the name of the Company or such Investor (or request that the Company effect such transfer in the name of an Investor) on the Company’s books any certificates, instruments, or book entry representing the Transfer Stock to be sold."
+    },
+    {
+      "paragraph_id": 48,
+      "type": "paragraph",
+      "text": "Violation of Co-Sale Right. If any Key Holder purports to sell any Transfer Stock in contravention of the Right of Co-Sale (a “Prohibited Transfer”), each Participating Investor who desires to exercise its Right of Co-Sale under Section 2.2 may, in addition to such remedies as may be available by law, in equity or hereunder, require such Key Holder to purchase from such Participating Investor the type and number of shares of Capital Stock that such Participating Investor would have been entitled to sell to the Prospective Transferee had the Prohibited Transfer been effected in compliance with the terms of Section 2.2. The sale will be made on the same terms, including, without limitation, as provided in Section 2.2(d)(i) and the first sentence of Section 2.2(d)(ii), as applicable, and subject to the same conditions as would have applied had the Key Holder not made the Prohibited Transfer, except that the sale (including, without limitation, the delivery of the purchase price) must be made within ninety (90) days after the Participating Investor learns of the Prohibited Transfer, as opposed to the timeframe proscribed in Section 2.2. Such Key Holder shall also reimburse each Participating Investor for any and all reasonable and documented out-of-pocket fees and expenses, including reasonable legal fees and expenses, incurred pursuant to the exercise or the attempted exercise of the Participating Investor’s rights under Section 2.2."
+    },
+    {
+      "paragraph_id": 49,
+      "type": "paragraph",
+      "text": "Exempt Transfers."
+    },
+    {
+      "paragraph_id": 50,
+      "type": "paragraph",
+      "text": "Exempted Transfers. Notwithstanding the foregoing or anything to the contrary herein, the provisions of Sections 2.1 and 2.2 shall not apply (a) in the case of a Key Holder that is an entity, upon a transfer by such Key Holder to its stockholders, members, partners or other equity holders, (b) to a repurchase of Transfer Stock from a Key Holder by the Company at a price no greater than that originally paid by such Key Holder for such Transfer Stock and pursuant to an agreement containing vesting and/or repurchase provisions approved by the Requisite Directors (as defined in the Restated Certificate), or (c) in the case of a Key Holder that is a natural person, upon a transfer of Transfer Stock by such Key Holder made for bona fide estate planning purposes, either during his or her lifetime or on death by will or intestacy to his or her spouse, including any life partner or similar statutorily-recognized domestic partner, child (natural or adopted), or any other direct lineal descendant of such Key Holder (or his or her spouse, including any life partner or similar statutorily-recognized domestic partner) (all of the foregoing collectively referred to as “family members”), or any other person approved by the Requisite Directors, or any custodian or trustee of any trust, partnership or limited liability company for the benefit of, or the ownership interests of which are owned wholly by such Key Holder or any such family members; provided that in the case of clause(s) (a) or (c), the Key Holder shall deliver prior written notice to the Investors of such gift or transfer and such shares of Transfer Stock shall at all times remain subject to the terms and restrictions set forth in this Agreement and such transferee shall, as a condition to such Transfer, deliver a counterpart signature page to this Agreement as confirmation that such transferee shall be bound by all the terms and conditions of this Agreement as a Key Holder (but only with respect to the securities so transferred to the transferee), including the obligations of a Key Holder with respect to Proposed Key Holder Transfers of such Transfer Stock pursuant to Section 2; and provided further in the case of any transfer pursuant to clause (a) or (d) above, that such transfer is made pursuant to a transaction in which there is no consideration actually paid for such transfer."
+    },
+    {
+      "paragraph_id": 51,
+      "type": "paragraph",
+      "text": "Exempted Offerings. Notwithstanding the foregoing or anything to the contrary herein, the provisions of Section 2 shall not apply to the sale of any Transfer Stock (a) to the public in an offering pursuant to an effective registration statement under the Securities Act of 1933, as amended (a “Public Offering”); or (b) pursuant to a Deemed Liquidation Event (as defined in the Restated Certificate)."
+    },
+    {
+      "paragraph_id": 52,
+      "type": "paragraph",
+      "text": "Prohibited Transferees. Notwithstanding the foregoing, no Key Holder shall transfer any Transfer Stock to (a) any entity which, in the determination of the Board of Directors, directly or indirectly competes with the Company, (b) any customer, distributor or supplier of the Company, if the Board of Directors should determine that such transfer would result in such customer, distributor or supplier receiving information that would place the Company at a competitive disadvantage with respect to such customer, distributor or supplier, or (c) any person or entity that is a Sanctioned Party."
+    },
+    {
+      "paragraph_id": 53,
+      "type": "paragraph",
+      "text": "Legend. Each certificate, instrument, or book entry representing shares of Transfer Stock held by the Key Holders or issued to any permitted transferee in connection with a transfer permitted by Section 3.1 hereof shall be notated with the following legend:"
+    },
+    {
+      "paragraph_id": 54,
+      "type": "paragraph",
+      "text": "THE SALE, PLEDGE, HYPOTHECATION, OR TRANSFER OF THE SECURITIES REPRESENTED HEREBY IS SUBJECT TO, AND IN CERTAIN CASES PROHIBITED BY, THE TERMS AND CONDITIONS OF A CERTAIN AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT BY AND AMONG THE STOCKHOLDER, THE CORPORATION AND CERTAIN OTHER HOLDERS OF STOCK OF THE CORPORATION. COPIES OF SUCH AGREEMENT MAY BE OBTAINED UPON WRITTEN REQUEST TO THE SECRETARY OF THE CORPORATION."
+    },
+    {
+      "paragraph_id": 55,
+      "type": "paragraph",
+      "text": "Each Key Holder agrees that the Company may instruct its transfer agent to impose transfer restrictions on the shares notated with the legend referred to in this Section 4 above to enforce the provisions of this Agreement, and the Company agrees to promptly do so. The legend shall be removed upon termination of this Agreement at the request of the holder. The legend shall be removed upon termination of this Agreement at the request of the holder. Each Key Holder agrees not to sell, assign, transfer, pledge or otherwise dispose of any securities of the Company, or any beneficial interest therein, in violation of any transfer restrictions in the Company’s Bylaws."
+    },
+    {
+      "paragraph_id": 56,
+      "type": "paragraph",
+      "text": "Lock-Up."
+    },
+    {
+      "paragraph_id": 57,
+      "type": "paragraph",
+      "text": "Agreement to Lock-Up. Each Key Holder hereby agrees that it will not, without the prior written consent of the managing underwriter, during the period commencing on the date of the final prospectus relating to the Company’s initial public offering (the “IPO”) and ending on the date specified by the Company and the managing underwriter (such period not to exceed one hundred eighty (l80) days), (a) lend, offer, pledge, sell, contract to sell, sell any option or contract to purchase, purchase any option or contract to sell, grant any option, right or warrant to purchase, or otherwise transfer or dispose of, directly or indirectly, any shares of Capital Stock held immediately prior to the effectiveness of the registration statement for the IPO; or (b) enter into any swap or other arrangement that transfers to another, in whole or in part, any of the economic consequences of ownership of the Capital Stock, whether any such transaction described in clause (a) or (b) above is to be settled by delivery of Capital Stock or other securities, in cash or otherwise. The foregoing provisions of this Section 5 shall not apply to the sale of any shares to an underwriter pursuant to an underwriting agreement or to the establishment of a trading plan pursuant to Rule 10b5-1, provided that such plan does not permit transfers during the restricted period, and shall only be applicable to the Key Holders if all officers, directors and holders of more than one percent (1%) of the outstanding Common Stock (after giving effect to the conversion into Common Stock of all outstanding Preferred Stock) enter into similar agreements. The underwriters in connection with the IPO are intended third-party beneficiaries of this Section 5 and shall have the right, power and authority to enforce the provisions hereof as though they were a party hereto. Each Key Holder further agrees to execute such agreements as may be reasonably requested by the underwriters in the IPO that are consistent with this Section 5 or that are necessary to give further effect thereto."
+    },
+    {
+      "paragraph_id": 58,
+      "type": "paragraph",
+      "text": "Stop Transfer Instructions. In order to enforce the foregoing covenant, the Company may impose stop-transfer instructions with respect to the shares of Capital Stock of each Key Holder (and transferees and assignees thereof) until the end of such restricted period."
+    },
+    {
+      "paragraph_id": 59,
+      "type": "paragraph",
+      "text": "Survival"
+    },
+    {
+      "paragraph_id": 60,
+      "type": "paragraph",
+      "text": ". Unless and only to the extent otherwise superseded by an underwriting agreement entered into in connection with the underwritten Public Offering, the obligations of the Key Holders under this Section 5 shall survive the termination of this Agreement or any provision(s) of this Agreement."
+    },
+    {
+      "paragraph_id": 61,
+      "type": "paragraph",
+      "text": "Miscellaneous."
+    },
+    {
+      "paragraph_id": 62,
+      "type": "paragraph",
+      "text": "Term. This Agreement shall automatically terminate upon the earlier of (a) immediately prior to the consummation of the Company’s IPO; and (b) the consummation of a Deemed Liquidation Event (as defined in the Restated Certificate)."
+    },
+    {
+      "paragraph_id": 63,
+      "type": "paragraph",
+      "text": "Stock Split. All references to numbers of shares in this Agreement shall be appropriately adjusted to reflect any stock dividend, split, combination or other recapitalization affecting the Capital Stock occurring after the date of this Agreement."
+    },
+    {
+      "paragraph_id": 64,
+      "type": "paragraph",
+      "text": "Ownership. Each Key Holder represents and warrants that such Key Holder is the sole legal and beneficial owner of the shares of Transfer Stock subject to this Agreement and that no other person or entity has any interest in such shares (other than a community property interest as to which the holder thereof has acknowledged and agreed in writing to the restrictions and obligations hereunder)."
+    },
+    {
+      "paragraph_id": 65,
+      "type": "paragraph",
+      "text": "Dispute Resolution. The parties (a) hereby irrevocably and unconditionally submit to the jurisdiction of the state courts of Delaware and to the jurisdiction of the United States District Court for the District of Delaware for the purpose of any suit, action or other proceeding arising out of or based upon this Agreement, (b) agree not to commence any suit, action or other proceeding arising out of or based upon this Agreement except in the state courts of Delaware or the United States District Court for the District of Delaware, and (c) hereby waive, and agree not to assert, by way of motion, as a defense, or otherwise, in any such suit, action or proceeding, any claim that it is not subject personally to the jurisdiction of the above-named courts, that its property is exempt or immune from attachment or execution, that the suit, action or proceeding is brought in an inconvenient forum, that the venue of the suit, action or proceeding is improper or that this Agreement or the subject matter hereof may not be enforced in or by such court."
+    },
+    {
+      "paragraph_id": 66,
+      "type": "paragraph",
+      "text": "Waiver of Jury Trial: EACH PARTY HEREBY WAIVES ITS RIGHTS TO A JURY TRIAL OF ANY CLAIM OR CAUSE OF ACTION BASED UPON OR ARISING OUT OF THIS AGREEMENT, THE OTHER TRANSACTION DOCUMENTS, THE SECURITIES OR THE SUBJECT MATTER HEREOF OR THEREOF. THE SCOPE OF THIS WAIVER IS INTENDED TO BE ALL-ENCOMPASSING OF ANY AND ALL DISPUTES THAT MAY BE FILED IN ANY COURT AND THAT RELATE TO THE SUBJECT MATTER OF THIS TRANSACTION, INCLUDING, WITHOUT LIMITATION, CONTRACT CLAIMS, TORT CLAIMS (INCLUDING NEGLIGENCE), BREACH OF DUTY CLAIMS, AND ALL OTHER COMMON LAW AND STATUTORY CLAIMS. THIS SECTION HAS BEEN FULLY DISCUSSED BY EACH OF THE PARTIES HERETO AND THESE PROVISIONS WILL NOT BE SUBJECT TO ANY EXCEPTIONS. EACH PARTY HERETO HEREBY FURTHER WARRANTS AND REPRESENTS THAT SUCH PARTY HAS REVIEWED THIS WAIVER WITH ITS LEGAL COUNSEL, AND THAT SUCH PARTY KNOWINGLY AND VOLUNTARILY WAIVES ITS JURY TRIAL RIGHTS FOLLOWING CONSULTATION WITH LEGAL COUNSEL."
+    },
+    {
+      "paragraph_id": 67,
+      "type": "paragraph",
+      "text": "Notices."
+    },
+    {
+      "paragraph_id": 68,
+      "type": "paragraph",
+      "text": "All notices and other communications given or made pursuant to this Agreement shall be in writing and shall be deemed effectively given upon the earlier of actual receipt or (a) personal delivery to the party to be notified, (b) when sent, if sent by electronic mail during normal business hours of the recipient, and if not sent during normal business hours, then on the recipient’s next business day, (c) five (5) days after having been sent by registered or certified mail, return receipt requested, postage prepaid, or (d) one (1) business day after deposit with a nationally recognized overnight courier, freight prepaid, specifying next business day delivery, with written verification of receipt. All communications shall be sent to the respective parties at their address as set forth on Schedule A or Schedule B hereof, as the case may be, or to such email address or address as subsequently modified by written notice given in accordance with this Section 6.5."
+    },
+    {
+      "paragraph_id": 69,
+      "type": "paragraph",
+      "text": "Consent to Electronic Notice. Each Investor and Key Holder consents to the delivery of any stockholder notice pursuant to the Delaware General Corporation Law (the “DGCL”), as amended or superseded from time to time, by electronic transmission pursuant to Section 232 of the DGCL (or any successor thereto) at the electronic mail address set forth below such Investor’s or Key Holder’s name on the Schedules hereto, as updated from time to time by notice to the Company, or as on the books of the Company. To the extent that any notice given by means of electronic transmission is returned or undeliverable for any reason, the foregoing consent shall be deemed to have been revoked until a new or corrected electronic mail address has been provided, and such attempted electronic notice shall be ineffective and deemed to not have been given. Each Investor and Key Holder agrees to promptly notify the Company of any change in its electronic mail address, and that failure to do so shall not affect the foregoing."
+    },
+    {
+      "paragraph_id": 70,
+      "type": "paragraph",
+      "text": "Entire Agreement. Upon the effectiveness of this Agreement, the Prior Agreement shall be deemed amended and restated and superseded and replaced in its entirety by this Agreement, and shall be of no further force or effect. This Agreement (including, the Exhibits and Schedules hereto) together with the other Transaction Documents (as defined in the Purchase Agreement) constitutes the full and entire understanding and agreement between the parties with respect to the subject matter hereof, and any other written or oral agreement relating to the subject matter hereof existing between the parties are expressly canceled."
+    },
+    {
+      "paragraph_id": 71,
+      "type": "paragraph",
+      "text": "Delays or Omissions. No delay or omission to exercise any right, power or remedy accruing to any party under this Agreement, upon any breach or default of any other party under this Agreement, shall impair any such right, power or remedy of such non-breaching or non-defaulting party nor shall it be construed to be a waiver of any such breach or default, or an acquiescence therein, or of or in any similar breach or default thereafter occurring; nor shall any waiver of any single breach or default be deemed a waiver of any other breach or default theretofore or thereafter occurring. Any waiver, permit, consent or approval of any kind or character on the part of any party of any breach or default under this Agreement, or any waiver on the part of any party of any provisions or conditions of this Agreement, must be in writing and shall be effective only to the extent specifically set forth in such writing. All remedies, either under this Agreement or by law or otherwise afforded to any party, shall be cumulative and not alternative."
+    },
+    {
+      "paragraph_id": 72,
+      "type": "paragraph",
+      "text": "Amendment; Waiver and Termination. This Agreement may be amended, modified or terminated (other than pursuant to Section 6.1 above) and the observance of any term hereof may be waived (either generally or in a particular instance and either retroactively or prospectively) only by a written instrument executed by (a) the Company, (b) the Key Holders holding at least a majority of the shares of Transfer Stock then held by all of the Key Holders, and (c) the holders of at least a majority of the shares of Common Stock issued or issuable upon conversion of the then outstanding shares of Preferred Stock held by the Investors (voting as a single separate class and on an as-converted basis). Any amendment, modification, termination or waiver so effected shall be binding upon the Company, the Investors, the Key Holders and all of their respective successors and permitted assigns whether or not such party, assignee or other shareholder entered into or approved such amendment, modification, termination or waiver. Notwithstanding the foregoing, (i) this Agreement may not be amended, modified or terminated and the observance of any term hereunder may not be waived with respect to any Investor or Key Holder without the written consent of such Investor or Key Holder unless such amendment, modification, termination or waiver applies to all Investors and Key Holders, respectively, in the same fashion, (ii) this Agreement may not be amended, modified or terminated and the observance of any term hereunder may not be waived with respect to any Investor without the written consent of such Investor, if such amendment, modification, termination or waiver would adversely affect the rights of such Investor in a manner disproportionate to any adverse effect such amendment, modification, termination or waiver would have on the rights of the other Investors under this Agreement, and (iii) the consent of the Key Holders shall not be required for any amendment, modification, termination or waiver if such amendment, modification, termination or waiver does not apply to the Key Holders. The Company shall give prompt written notice of any amendment, modification or termination hereof or waiver hereunder to any party hereto that did not consent in writing to such amendment, modification, termination or waiver. No waivers of or exceptions to any term, condition or provision of this Agreement, in any one (1) or more instances, shall be deemed to be, or construed as, a further or continuing waiver of any such term, condition or provision."
+    },
+    {
+      "paragraph_id": 73,
+      "type": "paragraph",
+      "text": "Assignment of Rights."
+    },
+    {
+      "paragraph_id": 74,
+      "type": "paragraph",
+      "text": "The terms and conditions of this Agreement shall inure to the benefit of and be binding upon the respective successors and permitted assigns of the parties. Nothing in this Agreement, express or implied, is intended to confer upon any party other than the parties hereto or their respective successors and permitted assigns any rights, remedies, obligations, or liabilities under or by reason of this Agreement, except as expressly provided in this Agreement."
+    },
+    {
+      "paragraph_id": 75,
+      "type": "paragraph",
+      "text": "Any successor or permitted assignee of any Key Holder, including any Prospective Transferee who purchases shares of Transfer Stock in accordance with the terms hereof, shall deliver to the Company and the Investors, as a condition to any transfer or assignment, a counterpart signature page hereto pursuant to which such successor or permitted assignee shall confirm their agreement to be subject to and bound by all of the provisions set forth in this Agreement that were applicable to the predecessor or assignor of such successor or permitted assignee."
+    },
+    {
+      "paragraph_id": 76,
+      "type": "paragraph",
+      "text": "The rights of the Investors hereunder are not assignable without the Company’s written consent (which shall not be unreasonably withheld, delayed or conditioned), except (i) by an Investor to any Affiliate, or (ii) to an assignee or transferee who acquires at least 740,000 shares of Capital Stock (as adjusted for any stock combination, stock split, stock dividend, recapitalization or other similar transaction), it being acknowledged and agreed that any such assignment, including an assignment contemplated by the preceding clauses (i) or (ii) shall be subject to and conditioned upon any such assignee’s delivery to the Company and the other Investors of a counterpart signature page hereto pursuant to which such assignee shall confirm their agreement to be subject to and bound by all of the provisions set forth in this Agreement that were applicable to the assignor of such assignee."
+    },
+    {
+      "paragraph_id": 77,
+      "type": "paragraph",
+      "text": "Except in connection with an assignment by the Company by operation of law to the acquirer of the Company, the rights and obligations of the Company hereunder may not be assigned under any circumstances."
+    },
+    {
+      "paragraph_id": 78,
+      "type": "paragraph",
+      "text": "Severability. The invalidity or unenforceability of any provision hereof shall in no way affect the validity or enforceability of any other provision."
+    },
+    {
+      "paragraph_id": 79,
+      "type": "paragraph",
+      "text": "Governing Law. This Agreement shall be governed by the internal law of the State of Delaware, without regard to conflict of law principles that would result in the application of any law other than the law of the State of Delaware."
+    },
+    {
+      "paragraph_id": 80,
+      "type": "paragraph",
+      "text": "Titles and Subtitles. The titles and subtitles used in this Agreement are used for convenience only and are not to be considered in construing or interpreting this Agreement."
+    },
+    {
+      "paragraph_id": 81,
+      "type": "paragraph",
+      "text": "Counterparts. This Agreement may be executed in two (2) or more counterparts, each of which shall be deemed an original, but all of which together shall constitute one and the same instrument. Counterparts may be delivered via electronic mail (including pdf or any electronic signature complying with the U.S. federal ESIGN Act of 2000, e.g., www.docusign.com) or other transmission method and any counterpart so delivered shall be deemed to have been duly and validly delivered and be valid and effective for all purposes."
+    },
+    {
+      "paragraph_id": 82,
+      "type": "paragraph",
+      "text": "Aggregation of Stock. All shares of Capital Stock held or acquired by Affiliated entities or persons shall be aggregated together for the purpose of determining the availability of any rights under this Agreement and such Affiliated persons may apportion such rights as among themselves in any manner they deem appropriate."
+    },
+    {
+      "paragraph_id": 83,
+      "type": "paragraph",
+      "text": "Specific Performance. In addition to any and all other remedies that may be available at law in the event of any breach of this Agreement, each Investor shall be entitled to specific performance of the agreements and obligations of the Company and the Key Holders hereunder and to such other injunction or other equitable relief as may be granted by a court of competent jurisdiction."
+    },
+    {
+      "paragraph_id": 84,
+      "type": "paragraph",
+      "text": "Additional Key Holders. In the event that after the date of this Agreement, the Company issues shares of Common Stock, or options to purchase Common Stock, to any employee or consultant, which shares or options would collectively constitute with respect to such employee or consultant (taking into account all shares of Common Stock, options and other purchase rights held by such employee or consultant) one percent (1%) or more of the Company’s then outstanding Common Stock (treating for this purpose all shares of Common Stock issuable upon exercise of or conversion of outstanding options, warrants or convertible securities, as if exercised or converted), the Company shall, as a condition to such issuance, cause such employee or consultant to execute a counterpart signature page hereto as a Key Holder, and such person shall thereby be bound by, and subject to, all the terms and provisions of this Agreement applicable to a Key Holder."
+    },
+    {
+      "paragraph_id": 85,
+      "type": "paragraph",
+      "text": "Sanctions"
+    },
+    {
+      "paragraph_id": 86,
+      "type": "paragraph",
+      "text": ". For the avoidance of doubt, at any time that a Person is or becomes a Sanctioned Party, all rights granted to the Person under this Agreement, including, without limitation, any right to purchase any Capital Stock, will be immediately suspended for so long as such Person is a Sanctioned Party or until authorization is issued by a relevant government authority as required by applicable Sanctions."
+    },
+    {
+      "paragraph_id": 87,
+      "type": "paragraph",
+      "text": "[Signature Page Follows]"
+    },
+    {
+      "paragraph_id": 88,
+      "type": "paragraph",
+      "text": "IN WITNESS WHEREOF, the parties have executed this Amended and Restated Right of First Refusal and Co-Sale Agreement as of the date first written above."
+    },
+    {
+      "paragraph_id": 89,
+      "type": "paragraph",
+      "text": "COMPANY:"
+    },
+    {
+      "paragraph_id": 90,
+      "type": "paragraph",
+      "text": "A Inc."
+    },
+    {
+      "paragraph_id": 91,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 92,
+      "type": "paragraph",
+      "text": "X, Chief Executive Officer"
+    },
+    {
+      "paragraph_id": 93,
+      "type": "paragraph",
+      "text": "KEY HOLDERS:"
+    },
+    {
+      "paragraph_id": 94,
+      "type": "paragraph",
+      "text": "Signature:"
+    },
+    {
+      "paragraph_id": 95,
+      "type": "paragraph",
+      "text": "X"
+    },
+    {
+      "paragraph_id": 96,
+      "type": "paragraph",
+      "text": "IN WITNESS WHEREOF, the parties have executed this Amended and Restated Right of First Refusal and Co-Sale Agreement as of the date first written above."
+    },
+    {
+      "paragraph_id": 97,
+      "type": "paragraph",
+      "text": "INVESTORS:"
+    },
+    {
+      "paragraph_id": 98,
+      "type": "paragraph",
+      "text": "E Capital Fund II L.P."
+    },
+    {
+      "paragraph_id": 99,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 100,
+      "type": "paragraph",
+      "text": "Y, Founding Partner"
+    },
+    {
+      "paragraph_id": 101,
+      "type": "paragraph",
+      "text": "IN WITNESS WHEREOF, the parties have executed this Amended and Restated Right of First Refusal and Co-Sale Agreement as of the date first written above."
+    },
+    {
+      "paragraph_id": 102,
+      "type": "paragraph",
+      "text": "INVESTORS:"
+    },
+    {
+      "paragraph_id": 103,
+      "type": "paragraph",
+      "text": "B Venture Partners VIII Investments, LLC"
+    },
+    {
+      "paragraph_id": 104,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 105,
+      "type": "paragraph",
+      "text": "Name: Z"
+    },
+    {
+      "paragraph_id": 106,
+      "type": "paragraph",
+      "text": "Title: Manager"
+    },
+    {
+      "paragraph_id": 107,
+      "type": "paragraph",
+      "text": "B Venture Partners VIII-HC, L.P."
+    },
+    {
+      "paragraph_id": 108,
+      "type": "paragraph",
+      "text": "By: B GP VIII-HC, LLC, its general partner"
+    },
+    {
+      "paragraph_id": 109,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 110,
+      "type": "paragraph",
+      "text": "Name: Z"
+    },
+    {
+      "paragraph_id": 111,
+      "type": "paragraph",
+      "text": "Title: Authorized Signatory"
+    },
+    {
+      "paragraph_id": 112,
+      "type": "paragraph",
+      "text": "IN WITNESS WHEREOF, the parties have executed this Amended and Restated Right of First Refusal and Co-Sale Agreement as of the date first written above."
+    },
+    {
+      "paragraph_id": 113,
+      "type": "paragraph",
+      "text": "INVESTORS:"
+    },
+    {
+      "paragraph_id": 114,
+      "type": "paragraph",
+      "text": "C Partners Fund VI, L.P."
+    },
+    {
+      "paragraph_id": 115,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 116,
+      "type": "paragraph",
+      "text": "Name:"
+    },
+    {
+      "paragraph_id": 117,
+      "type": "paragraph",
+      "text": "Title:"
+    },
+    {
+      "paragraph_id": 118,
+      "type": "paragraph",
+      "text": "C Partners Fund VI-A, L.P."
+    },
+    {
+      "paragraph_id": 119,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 120,
+      "type": "paragraph",
+      "text": "Name:"
+    },
+    {
+      "paragraph_id": 121,
+      "type": "paragraph",
+      "text": "Title:"
+    },
+    {
+      "paragraph_id": 122,
+      "type": "paragraph",
+      "text": "IN WITNESS WHEREOF, the parties have executed this Amended and Restated Right of First Refusal and Co-Sale Agreement as of the date first written above."
+    },
+    {
+      "paragraph_id": 123,
+      "type": "paragraph",
+      "text": "INVESTORS:"
+    },
+    {
+      "paragraph_id": 124,
+      "type": "paragraph",
+      "text": "D Ventures LLC"
+    },
+    {
+      "paragraph_id": 125,
+      "type": "paragraph",
+      "text": "By:"
+    },
+    {
+      "paragraph_id": 126,
+      "type": "paragraph",
+      "text": "Name:"
+    },
+    {
+      "paragraph_id": 127,
+      "type": "paragraph",
+      "text": "Title:"
+    }
+  ]
+}

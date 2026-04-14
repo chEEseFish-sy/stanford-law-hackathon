@@ -4,12 +4,15 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Download,
   History,
   Info,
   Sparkles,
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import type { TabKey } from "../../types/navigation";
+import type { CapTableVersion } from "../../types/topology";
+import { downloadCapTableCsv } from "../../utils/captableExport";
 import { cn } from "../../utils/cn";
 
 export function WorkingCapTable({
@@ -19,6 +22,7 @@ export function WorkingCapTable({
 }) {
   const { snapshot, setViewingVersion } = useWorkbench();
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  const [explainedRows, setExplainedRows] = useState<string[]>([]);
   const currentVersion = snapshot?.captableVersions.find(
     (version) => version.topologyNodeId === snapshot.topology.currentViewingNodeId,
   );
@@ -34,11 +38,28 @@ export function WorkingCapTable({
     [snapshot],
   );
   const versionNodes = snapshot?.topology.nodes.filter((node) => node.nodeType === "captable_version") ?? [];
+  const captableByNodeId = useMemo(
+    () => new Map((snapshot?.captableVersions ?? []).map((version) => [version.topologyNodeId, version])),
+    [snapshot],
+  );
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) =>
       prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
     );
+  };
+
+  const toggleExplanation = (id: string) => {
+    setExplainedRows((prev) =>
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
+    );
+  };
+
+  const downloadVersion = (version: CapTableVersion | undefined) => {
+    if (!version || !snapshot) {
+      return;
+    }
+    downloadCapTableCsv(version, snapshot.documents);
   };
 
   const capTableData =
@@ -54,6 +75,12 @@ export function WorkingCapTable({
         ownership: `${row.ownershipPercentage}%`,
         status: conflictLookup.has(row.sourceDocumentId) ? "needs_review" : "confirmed",
         conflict: conflictLookup.get(row.sourceDocumentId),
+        explanation:
+          `${row.holderName} appears because ${row.shares.toLocaleString()} ${row.securityType} share(s) were reconstructed from ${sourceDocument?.fileName ?? row.sourceDocumentId} at ${row.sourceLocation}. ` +
+          `This row contributes ${row.ownershipPercentage}% to ${currentVersion.versionName}. ` +
+          (conflictLookup.has(row.sourceDocumentId)
+            ? "The source document still has review findings, so this row should be treated as reviewable evidence."
+            : "No conflicting evidence finding is currently linked to this source document."),
         details: [
           { label: "Source Document", value: sourceDocument?.fileName ?? row.sourceDocumentId },
           { label: "Source Location", value: row.sourceLocation },
@@ -85,21 +112,48 @@ export function WorkingCapTable({
               Roll back or switch versions
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
-              {versionNodes.map((node) => (
-                <button
-                  key={node.id}
-                  onClick={() => void setViewingVersion(node.id)}
-                  className={cn(
-                    "rounded-full border px-4 py-2 text-sm transition",
-                    snapshot?.topology.currentViewingNodeId === node.id
-                      ? "border-orange-300/35 bg-white/10 text-white"
-                      : "border-white/10 bg-black/20 text-white/65 hover:bg-white/[0.06]",
-                  )}
-                >
-                  {node.label}
-                </button>
-              ))}
+              {versionNodes.map((node) => {
+                const version = captableByNodeId.get(node.id);
+
+                return (
+                  <div
+                    key={node.id}
+                    className={cn(
+                      "flex items-center overflow-hidden rounded-full border text-sm transition",
+                      snapshot?.topology.currentViewingNodeId === node.id
+                        ? "border-orange-300/35 bg-white/10 text-white"
+                        : "border-white/10 bg-black/20 text-white/65",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void setViewingVersion(node.id)}
+                      className="px-4 py-2 text-left transition hover:bg-white/[0.06]"
+                    >
+                      {node.label}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadVersion(version)}
+                      disabled={!version}
+                      className="border-l border-white/10 px-3 py-2 text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label={`Download ${node.label}`}
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+            <button
+              type="button"
+              onClick={() => downloadVersion(currentVersion)}
+              disabled={!currentVersion}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-orange-300/25 bg-black/20 px-4 py-2 text-sm text-white transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download className="h-4 w-4" />
+              Download current cap table
+            </button>
           </div>
         </div>
 
@@ -119,6 +173,7 @@ export function WorkingCapTable({
             <tbody className="text-sm font-medium text-white/78">
               {capTableData.map((row) => {
                 const isExpanded = expandedRows.includes(row.id);
+                const isExplained = explainedRows.includes(row.id);
                 return (
                   <AnimatePresence key={row.id} initial={false}>
                     <tr 
@@ -185,10 +240,22 @@ export function WorkingCapTable({
                                   </div>
                                 ))}
                               </div>
-                              <button className="mt-5 rounded-full border border-orange-300/25 bg-orange-500/10 px-4 py-2 text-sm text-white transition hover:bg-orange-500/18">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleExplanation(row.id);
+                                }}
+                                className="mt-5 rounded-lg border border-orange-300/25 bg-orange-500/10 px-4 py-2 text-sm text-white transition hover:bg-orange-500/18"
+                              >
                                 <Sparkles className="mr-2 inline h-4 w-4" />
-                                Explain with AI
+                                {isExplained ? "Hide explanation" : "Explain with AI"}
                               </button>
+                              {isExplained ? (
+                                <div className="mt-4 rounded-[18px] border border-orange-300/18 bg-orange-500/10 p-4 text-sm leading-7 text-orange-50/82">
+                                  {row.explanation}
+                                </div>
+                              ) : null}
                             </div>
                             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
                               <div className="text-sm font-semibold text-white">Decision support</div>
@@ -196,8 +263,12 @@ export function WorkingCapTable({
                                 <>
                                   <p className="mt-3 text-sm leading-7 text-amber-100/85">{row.conflict}</p>
                                   <button
-                                    onClick={() => setActiveTab("review")}
-                                    className="mt-5 rounded-full border border-amber-300/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-100 transition hover:bg-amber-500/16"
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setActiveTab("review");
+                                    }}
+                                    className="mt-5 rounded-lg border border-amber-300/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-100 transition hover:bg-amber-500/16"
                                   >
                                     Resolve in Step 2
                                   </button>

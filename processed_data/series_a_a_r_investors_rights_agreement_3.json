@@ -1,0 +1,411 @@
+{
+  "source_file": "Series A - A&R Investors' Rights Agreement_3.docx",
+  "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
+  "document_type": "",
+  "parties": [],
+  "dates": [],
+  "financing_terms": {
+    "round": "",
+    "security_classes": [],
+    "purchase_price": [],
+    "share_amounts": [],
+    "valuation_or_cap": [],
+    "closing_terms": [],
+    "milestones": []
+  },
+  "investor_rights": [],
+  "company_obligations": [],
+  "transfer_or_voting_restrictions": [],
+  "key_conditions": [],
+  "risks_or_review_items": [],
+  "raw_candidates": {
+    "dates": [
+      {
+        "value": "[●], 2025",
+        "paragraph_id": 1,
+        "source_text": "THIS AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT (this “Agreement”), is made as of [●], 2025, by and among A, a Delaware corporation (the “Company”), each of the investors listed on Schedule A hereto, each of which is referred to in this Agreement as an “Investor”.",
+        "date_iso": null
+      },
+      {
+        "value": "April 7, 2025",
+        "paragraph_id": 3,
+        "source_text": "WHEREAS, certain of the Investors (the “Existing Investors”) hold shares of Series Seed Preferred Stock, Series Seed-1 Preferred Stock and/or shares of Common Stock issued upon conversion thereof and possess registration rights, information rights, rights of first offer, and other rights pursuant to that certain Investors’ Rights Agreement dated as of April 7, 2025, by and among the Company and such Existing Investors (the “Prior Agreement”);",
+        "date_iso": "2025-04-07"
+      }
+    ],
+    "money": [
+      {
+        "value": "$0.0001",
+        "paragraph_id": 13,
+        "source_text": "“Common Stock” means shares of the Company’s common stock, par value $0.0001 per share."
+      },
+      {
+        "value": "$0.0001",
+        "paragraph_id": 43,
+        "source_text": "“Series Seed Preferred Stock” means shares of the Company’s Series Seed Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "$0.0001",
+        "paragraph_id": 44,
+        "source_text": "“Series Seed-1 Preferred Stock” means shares of the Company’s Series Seed-1 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "$0.0001",
+        "paragraph_id": 46,
+        "source_text": "“Series A-1 Preferred Stock” means shares of the Company’s Series A-1 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "$0.0001",
+        "paragraph_id": 47,
+        "source_text": "“Series A-2 Preferred Stock” means shares of the Company’s Series A-2 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "$0.0001",
+        "paragraph_id": 48,
+        "source_text": "“Series A-3 Preferred Stock” means shares of the Company’s Series A-3 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "$10,000,000,",
+        "paragraph_id": 102,
+        "source_text": "as soon as practicable, but in any event within one hundred eighty (180) days after the end of each fiscal year of the Company (i) a balance sheet as of the end of such year, (ii) statements of income and of cash flows for such year, and (iii) a statement of stockholders’ equity as of the end of such year, all such financial statements unaudited, provided, that, from the fiscal year in which the total expenses of the Company exceeds $10,000,000, all such financial statements shall be prepared in accordance with GAAP and audited and certified by independent public accountants of nationally r..."
+      },
+      {
+        "value": "$250,000",
+        "paragraph_id": 133,
+        "source_text": "incur any aggregate indebtedness in excess of $250,000 that is not already included in the Budget (as defined in Section 3.1(d)), other than trade credit incurred in the ordinary course of business;"
+      },
+      {
+        "value": "$250,000",
+        "paragraph_id": 140,
+        "source_text": "enter into any commercial contract outside the ordinary course of business or any corporate strategic relationship involving the payment, contribution, or assignment by the Company or to the Company of money or assets greater than $250,000."
+      },
+      {
+        "value": "$150,000",
+        "paragraph_id": 145,
+        "source_text": "Expense Reimbursement. In the event of an IPO or a transaction that is a Sale of the Company (as defined in the Voting Agreement of even date herewith among the Investors, the Company and the other parties named therein) (each, a “Reimbursed Transaction”), the reasonable fees and disbursements, not to exceed $150,000 in the aggregate, of one counsel for the Investors (“Investor Counsel”), solely in their capacities as stockholders, shall be borne and paid by the Company."
+      }
+    ],
+    "percentages": [
+      {
+        "value": "50%",
+        "paragraph_id": 36,
+        "source_text": "“Sanctioned Party” means any Person: (i) organized under the laws of, ordinarily resident in, or located in a country or territory that is the subject of comprehensive Sanctions (“Restricted Countries”); (ii) 50% or more owned or controlled by the government of a Restricted Country; or (iii) (A) designated on a sanctioned parties list administered by the United States, including, without limitation, the U.S. Department of the Treasury’s Office of Foreign Assets Control’s Specially Designated Nationals and Blocked Persons List, Foreign Sanctions Evaders List, and Sectoral Sanctions Identific..."
+      },
+      {
+        "value": "40%",
+        "paragraph_id": 51,
+        "source_text": "Form S-1 Demand. If at any time after one hundred eighty (180) days after the effective date of the registration statement for the IPO, the Company receives a request from Holders of a majority of the Registrable Securities then outstanding that the Company file a Form S-1 registration statement with respect to at least forty percent (40%) of the Registrable Securities then outstanding, then the Company shall: (x) within ten (10) days after the date such request is given, give notice thereof (the “Demand Notice”) to all Holders other than the Initiating Holders; and (y) as soon as practicab..."
+      },
+      {
+        "value": "20%",
+        "paragraph_id": 52,
+        "source_text": "Form S-3 Demand. If at any time when it is eligible to use a Form S-3 registration statement, the Company receives a request from Holders of at least twenty percent (20%) of the Registrable Securities then outstanding that the Company file a Form S-3 registration statement with respect to outstanding Registrable Securities of such Holders having an anticipated aggregate offering price, net of Selling Expenses, of at least $five (5) million, then the Company shall (i) within ten (10) days after the date such request is given, give a Demand Notice to all Holders other than the Initiating Hold..."
+      },
+      {
+        "value": "20%",
+        "paragraph_id": 58,
+        "source_text": "In connection with any offering involving an underwriting of shares of the Company’s capital stock pursuant to Section 2.2, the Company shall not be required to include any of the Holders’ Registrable Securities in such underwriting unless the Holders accept the terms of the underwriting as agreed upon between the Company and its underwriters, and then only in such quantity as the underwriters in their sole discretion determine will not jeopardize the success of the offering by the Company. If the total number of securities, including Registrable Securities, requested by stockholders to be..."
+      },
+      {
+        "value": "2%",
+        "paragraph_id": 86,
+        "source_text": "“Market Stand-off” Agreement. Each Holder hereby agrees that it will not, without the prior written consent of the managing underwriter, during the period commencing on the date of the final prospectus relating to the registration by the Company for its own behalf of shares of its Common Stock or any other equity securities under the Securities Act on a registration statement on Form S-1, and ending on the date specified by the Company and the managing underwriter (such period not to exceed one hundred eighty (180) days in the case of the IPO, or such other period as may be requested by the..."
+      },
+      {
+        "value": "25%",
+        "paragraph_id": 127,
+        "source_text": "Employee Stock. Unless otherwise approved by the Board of Directors, including the Requisite Preferred Director Votes, the Founder and all employees, directors and other service providers (but excluding professional and expert consultants) of the Company who purchase, receive options to purchase, or receive awards of shares of the Company’s capital stock after the date hereof shall be required to execute restricted stock or option agreements, as applicable, providing for (i) vesting of shares over a four (4) year period, with the first twenty-five percent (25%) of such shares vesting on the..."
+      }
+    ],
+    "share_counts": [
+      {
+        "value": "1 Preferred Stock",
+        "paragraph_id": 3,
+        "source_text": "WHEREAS, certain of the Investors (the “Existing Investors”) hold shares of Series Seed Preferred Stock, Series Seed-1 Preferred Stock and/or shares of Common Stock issued upon conversion thereof and possess registration rights, information rights, rights of first offer, and other rights pursuant to that certain Investors’ Rights Agreement dated as of April 7, 2025, by and among the Company and such Existing Investors (the “Prior Agreement”);"
+      },
+      {
+        "value": "100,000 shares",
+        "paragraph_id": 28,
+        "source_text": "“Major Investor” means any Investor that, individually or together with such Investor’s Affiliates, holds at least 100,000 shares of Registrable Securities (as adjusted for any stock split, stock dividend, combination, or other recapitalization or reclassification effected after the date hereof)."
+      },
+      {
+        "value": "1 Preferred Stock",
+        "paragraph_id": 32,
+        "source_text": "“Preferred Stock” means, collectively, shares of the Company’s Series Seed Preferred Stock, Series Seed-1 Preferred Stock, Series A-1 Preferred Stock, Series A-2 Preferred Stock and Series A-3 Preferred Stock."
+      },
+      {
+        "value": "2 Preferred Stock",
+        "paragraph_id": 32,
+        "source_text": "“Preferred Stock” means, collectively, shares of the Company’s Series Seed Preferred Stock, Series Seed-1 Preferred Stock, Series A-1 Preferred Stock, Series A-2 Preferred Stock and Series A-3 Preferred Stock."
+      },
+      {
+        "value": "3 Preferred Stock",
+        "paragraph_id": 32,
+        "source_text": "“Preferred Stock” means, collectively, shares of the Company’s Series Seed Preferred Stock, Series Seed-1 Preferred Stock, Series A-1 Preferred Stock, Series A-2 Preferred Stock and Series A-3 Preferred Stock."
+      },
+      {
+        "value": "1 Preferred Stock",
+        "paragraph_id": 44,
+        "source_text": "“Series Seed-1 Preferred Stock” means shares of the Company’s Series Seed-1 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "1 Preferred Stock",
+        "paragraph_id": 45,
+        "source_text": "“Series A Preferred Stock” means, collectively, shares of the Company’s Series A-1 Preferred Stock, Series A-2 Preferred Stock and Series A-3 Preferred Stock."
+      },
+      {
+        "value": "2 Preferred Stock",
+        "paragraph_id": 45,
+        "source_text": "“Series A Preferred Stock” means, collectively, shares of the Company’s Series A-1 Preferred Stock, Series A-2 Preferred Stock and Series A-3 Preferred Stock."
+      },
+      {
+        "value": "3 Preferred Stock",
+        "paragraph_id": 45,
+        "source_text": "“Series A Preferred Stock” means, collectively, shares of the Company’s Series A-1 Preferred Stock, Series A-2 Preferred Stock and Series A-3 Preferred Stock."
+      },
+      {
+        "value": "1 Preferred Stock",
+        "paragraph_id": 46,
+        "source_text": "“Series A-1 Preferred Stock” means shares of the Company’s Series A-1 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "2 Preferred Stock",
+        "paragraph_id": 47,
+        "source_text": "“Series A-2 Preferred Stock” means shares of the Company’s Series A-2 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "3 Preferred Stock",
+        "paragraph_id": 48,
+        "source_text": "“Series A-3 Preferred Stock” means shares of the Company’s Series A-3 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "775,000 shares",
+        "paragraph_id": 110,
+        "source_text": "With respect to B Venture Partners VIII Investments, LLC and B Venture Partners VIII-HC, L.P. (together, “B”), as long as it owns not less than 775,000 shares of Preferred Stock (as adjusted for stock splits, stock combinations, stock dividends and the like), and if it has not designated a member of the Board of Directors, the Company shall invite a representative of such Investor to attend all meetings of the Board of Directors in a nonvoting observer capacity and, in this respect, shall give such representative copies of all notices, minutes, consents, and other materials that it provides..."
+      },
+      {
+        "value": "775,000 shares",
+        "paragraph_id": 111,
+        "source_text": "With respect to C Partners Fund VI, L.P. and C Partners Fund VI-A, L.P. (together, “C”), as long as it owns not less than 775,000 shares of Preferred Stock (as adjusted for stock splits, stock combinations, stock dividends and the like), and if it has not designated a member of the Board of Directors, the Company shall invite a representative of such Investor to attend all meetings of the Board of Directors in a nonvoting observer capacity and, in this respect, shall give such representative copies of all notices, minutes, consents, and other materials that it provides to the Board of Direc..."
+      },
+      {
+        "value": "596,000 shares",
+        "paragraph_id": 112,
+        "source_text": "With respect to D Ventures LLC (“D”), as long as it owns not less than 596,000 shares of Preferred Stock (as adjusted for stock splits, stock combinations, stock dividends and the like), the Company shall invite a representative of such Investor to attend all meetings of the Board of Directors in a nonvoting observer capacity and, in this respect, shall give such representative copies of all notices, minutes, consents, and other materials that it provides to the Board of Directors; provided, however, that such representative shall agree to hold in confidence all information so provided; and..."
+      }
+    ],
+    "section_titles": [
+      {
+        "value": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
+        "paragraph_id": 0,
+        "source_text": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT"
+      },
+      {
+        "value": "RECITALS",
+        "paragraph_id": 2,
+        "source_text": "RECITALS"
+      },
+      {
+        "value": "“Board of Directors” means the board of directors of the Company.",
+        "paragraph_id": 10,
+        "source_text": "“Board of Directors” means the board of directors of the Company."
+      },
+      {
+        "value": "“Common Stock” means shares of the Company’s common stock, par value $0.0001 per share.",
+        "paragraph_id": 13,
+        "source_text": "“Common Stock” means shares of the Company’s common stock, par value $0.0001 per share."
+      },
+      {
+        "value": "“GAAP” means generally accepted accounting principles in the United States as in effect from time to time.",
+        "paragraph_id": 23,
+        "source_text": "“GAAP” means generally accepted accounting principles in the United States as in effect from time to time."
+      },
+      {
+        "value": "“Holder” means any holder of Registrable Securities who is a party to this Agreement.",
+        "paragraph_id": 24,
+        "source_text": "“Holder” means any holder of Registrable Securities who is a party to this Agreement."
+      },
+      {
+        "value": "“Initiating Holders” means, collectively, Holders who properly initiate a registration request under this Agreement.",
+        "paragraph_id": 26,
+        "source_text": "“Initiating Holders” means, collectively, Holders who properly initiate a registration request under this Agreement."
+      },
+      {
+        "value": "“IPO” means the Company’s first underwritten public offering of its Common Stock under the Securities Act.",
+        "paragraph_id": 27,
+        "source_text": "“IPO” means the Company’s first underwritten public offering of its Common Stock under the Securities Act."
+      },
+      {
+        "value": "“Person” means any individual, corporation, partnership, trust, limited liability company, association or other entity.",
+        "paragraph_id": 30,
+        "source_text": "“Person” means any individual, corporation, partnership, trust, limited liability company, association or other entity."
+      },
+      {
+        "value": "“SEC” means the Securities and Exchange Commission.",
+        "paragraph_id": 38,
+        "source_text": "“SEC” means the Securities and Exchange Commission."
+      },
+      {
+        "value": "“SEC Rule 144” means Rule 144 promulgated by the SEC under the Securities Act.",
+        "paragraph_id": 39,
+        "source_text": "“SEC Rule 144” means Rule 144 promulgated by the SEC under the Securities Act."
+      },
+      {
+        "value": "“SEC Rule 145” means Rule 145 promulgated by the SEC under the Securities Act.",
+        "paragraph_id": 40,
+        "source_text": "“SEC Rule 145” means Rule 145 promulgated by the SEC under the Securities Act."
+      },
+      {
+        "value": "“Securities Act” means the Securities Act of 1933, as amended, and the rules and regulations promulgated thereunder.",
+        "paragraph_id": 41,
+        "source_text": "“Securities Act” means the Securities Act of 1933, as amended, and the rules and regulations promulgated thereunder."
+      },
+      {
+        "value": "“Series Seed Preferred Stock” means shares of the Company’s Series Seed Preferred Stock, par value $0.0001 per share.",
+        "paragraph_id": 43,
+        "source_text": "“Series Seed Preferred Stock” means shares of the Company’s Series Seed Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "“Series A-1 Preferred Stock” means shares of the Company’s Series A-1 Preferred Stock, par value $0.0001 per share.",
+        "paragraph_id": 46,
+        "source_text": "“Series A-1 Preferred Stock” means shares of the Company’s Series A-1 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "“Series A-2 Preferred Stock” means shares of the Company’s Series A-2 Preferred Stock, par value $0.0001 per share.",
+        "paragraph_id": 47,
+        "source_text": "“Series A-2 Preferred Stock” means shares of the Company’s Series A-2 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "“Series A-3 Preferred Stock” means shares of the Company’s Series A-3 Preferred Stock, par value $0.0001 per share.",
+        "paragraph_id": 48,
+        "source_text": "“Series A-3 Preferred Stock” means shares of the Company’s Series A-3 Preferred Stock, par value $0.0001 per share."
+      },
+      {
+        "value": "Demand Registration.",
+        "paragraph_id": 50,
+        "source_text": "Demand Registration."
+      },
+      {
+        "value": "Underwriting Requirements.",
+        "paragraph_id": 56,
+        "source_text": "Underwriting Requirements."
+      },
+      {
+        "value": "Restrictions on Transfer.",
+        "paragraph_id": 87,
+        "source_text": "Restrictions on Transfer."
+      },
+      {
+        "value": "Termination of Registration Rights.",
+        "paragraph_id": 94,
+        "source_text": "Termination of Registration Rights."
+      },
+      {
+        "value": "the third (3rd) anniversary of the IPO.",
+        "paragraph_id": 98,
+        "source_text": "the third (3rd) anniversary of the IPO."
+      },
+      {
+        "value": "Information Rights.",
+        "paragraph_id": 100,
+        "source_text": "Information Rights."
+      },
+      {
+        "value": "Observer Rights.",
+        "paragraph_id": 109,
+        "source_text": "Observer Rights."
+      },
+      {
+        "value": "Rights to Future Stock Issuances.",
+        "paragraph_id": 117,
+        "source_text": "Rights to Future Stock Issuances."
+      },
+      {
+        "value": "Additional Covenants.",
+        "paragraph_id": 124,
+        "source_text": "Additional Covenants."
+      },
+      {
+        "value": ".",
+        "paragraph_id": 144,
+        "source_text": "."
+      },
+      {
+        "value": "Miscellaneous.",
+        "paragraph_id": 154,
+        "source_text": "Miscellaneous."
+      },
+      {
+        "value": "Notices.",
+        "paragraph_id": 159,
+        "source_text": "Notices."
+      },
+      {
+        "value": "COMPANY:",
+        "paragraph_id": 171,
+        "source_text": "COMPANY:"
+      },
+      {
+        "value": "A Inc.",
+        "paragraph_id": 172,
+        "source_text": "A Inc."
+      },
+      {
+        "value": "INVESTORS:",
+        "paragraph_id": 176,
+        "source_text": "INVESTORS:"
+      },
+      {
+        "value": "E II L.P.",
+        "paragraph_id": 177,
+        "source_text": "E II L.P."
+      },
+      {
+        "value": "INVESTORS:",
+        "paragraph_id": 181,
+        "source_text": "INVESTORS:"
+      },
+      {
+        "value": "B Venture Partners VIII-HC, L.P.",
+        "paragraph_id": 186,
+        "source_text": "B Venture Partners VIII-HC, L.P."
+      },
+      {
+        "value": "INVESTORS:",
+        "paragraph_id": 192,
+        "source_text": "INVESTORS:"
+      },
+      {
+        "value": "C Partners Fund VI, L.P.",
+        "paragraph_id": 193,
+        "source_text": "C Partners Fund VI, L.P."
+      },
+      {
+        "value": "C Partners Fund VI-A, L.P.",
+        "paragraph_id": 197,
+        "source_text": "C Partners Fund VI-A, L.P."
+      },
+      {
+        "value": "INVESTORS:",
+        "paragraph_id": 202,
+        "source_text": "INVESTORS:"
+      }
+    ]
+  },
+  "confidence": 0.0,
+  "processing_metadata": {
+    "model": "no-llm",
+    "processed_at": "2026-04-13T02:13:24.138660+00:00",
+    "chunk_count": 7,
+    "status": "candidates_ready",
+    "paragraph_count": 207,
+    "character_count": 102050
+  },
+  "candidate_group_counts": {
+    "metadata": 80,
+    "dates": 80,
+    "financing": 80,
+    "rights": 54,
+    "risks": 80
+  }
+}

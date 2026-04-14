@@ -19,7 +19,6 @@ import {
   PanelRightOpen,
   Send,
   Upload,
-  Sparkles,
 } from "lucide-react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
@@ -551,6 +550,9 @@ export function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {uploadFeedback ? (
+                <span className="text-xs text-white/45">{uploadFeedback}</span>
+              ) : null}
               <input
                 ref={fileInputRef}
                 type="file"
