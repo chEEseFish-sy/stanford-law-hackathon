@@ -19,6 +19,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT_DIR = ROOT_DIR / "data_process"
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "processed_data"
 DB_PATH = DEFAULT_OUTPUT_DIR / "vericap.sqlite3"
+MIN_CAPTABLE_SHARE_COUNT = 1_000
 
 
 def utc_now() -> str:
@@ -134,6 +135,7 @@ def init_store() -> None:
         )
 
     seed_if_empty()
+    rebuild_generated_captables()
 
 
 def seed_if_empty() -> None:
@@ -543,33 +545,18 @@ def infer_security_type(title: str) -> str:
 
 def write_captable_rows(conn: sqlite3.Connection, case_id: str, version_id: str, document_ids: list[str]) -> None:
     rows: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str, float]] = set()
     for document_id in document_ids:
         file_row = conn.execute("SELECT * FROM files WHERE id = ?", (document_id,)).fetchone()
         result_row = conn.execute("SELECT raw_json FROM structured_results WHERE document_id = ?", (document_id,)).fetchone()
         raw = json.loads(result_row["raw_json"]) if result_row else {}
         title = file_row["file_name"] if file_row else document_id
-        shares = raw.get("raw_candidates", {}).get("share_counts", [])
-        if not shares:
-            rows.append(
-                {
-                    "holder": "Review placeholder",
-                    "security": infer_security_type(title),
-                    "shares": 0.0,
-                    "document_id": document_id,
-                    "location": "Processed candidates",
-                }
-            )
-            continue
-        for index, share in enumerate(shares[:6], start=1):
-            rows.append(
-                {
-                    "holder": infer_holder(str(share.get("source_text", "")), index),
-                    "security": infer_security_type(title),
-                    "shares": parse_number(str(share.get("value", "0"))),
-                    "document_id": document_id,
-                    "location": f"paragraph {share.get('paragraph_id', 'unknown')}",
-                }
-            )
+        for row in extract_captable_rows(raw, title, document_id):
+            key = (row["holder"], row["security"], row["location"], row["shares"])
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            rows.append(row)
 
     total = sum(row["shares"] for row in rows)
     for row in rows:
@@ -592,6 +579,208 @@ def write_captable_rows(conn: sqlite3.Connection, case_id: str, version_id: str,
                 row["location"],
             ),
         )
+
+
+def rebuild_generated_captables() -> None:
+    """Recompute cached cap table rows after extractor improvements.
+
+    Cap table rows are derived from stored structured results, not user-authored
+    records. Rebuilding keeps older local demo databases from showing stale
+    regex false positives such as "1 Preferred Stock".
+    """
+
+    with connect() as conn:
+        versions = list(conn.execute("SELECT * FROM captable_versions ORDER BY created_at"))
+        for version in versions:
+            document_ids = json.loads(version["generated_from_document_ids_json"])
+            conn.execute("DELETE FROM captable_rows WHERE version_id = ?", (version["id"],))
+            write_captable_rows(conn, version["case_id"], version["id"], document_ids)
+            row_count = conn.execute(
+                "SELECT COUNT(*) AS count FROM captable_rows WHERE version_id = ?",
+                (version["id"],),
+            ).fetchone()["count"]
+            conn.execute(
+                "UPDATE captable_versions SET summary = ? WHERE id = ?",
+                (
+                    f"Generated from {len(document_ids)} document(s). "
+                    f"{row_count} material cap table row(s) were reconstructed from evidence.",
+                    version["id"],
+                ),
+            )
+
+
+def extract_captable_rows(raw: dict[str, Any], title: str, document_id: str) -> list[dict[str, Any]]:
+    candidates = raw.get("raw_candidates", {}) if isinstance(raw.get("raw_candidates"), dict) else {}
+    share_candidates = candidates.get("share_counts", []) if isinstance(candidates.get("share_counts"), list) else []
+    rows: list[dict[str, Any]] = []
+
+    for candidate in share_candidates:
+        if not isinstance(candidate, dict):
+            continue
+        source_text = str(candidate.get("source_text") or "")
+        paragraph_id = candidate.get("paragraph_id", "unknown")
+        location = f"paragraph {paragraph_id}"
+        text = clean_capitalization_text(source_text)
+
+        rows.extend(extract_common_outstanding_rows(text, document_id, location))
+        rows.extend(extract_preferred_outstanding_rows(text, document_id, location))
+        rows.extend(extract_stock_plan_rows(text, document_id, location))
+        rows.extend(extract_minimum_closing_rows(text, document_id, location))
+
+    if rows:
+        return dedupe_captable_rows(rows)
+
+    return extract_llm_share_rows(raw, title, document_id)
+
+
+def extract_common_outstanding_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
+    rows = []
+    match = re.search(
+        r"(?P<authorized>\d[\d,]*)\s+shares\s+of\s+common\s+stock.*?"
+        r"(?P<outstanding>\d[\d,]*)\s+shares\s+of\s+which\s+are\s+issued\s+and\s+outstanding",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        rows.append(
+            captable_row(
+                "Existing common stockholders",
+                "Common Stock",
+                match.group("outstanding"),
+                document_id,
+                location,
+            )
+        )
+    return rows
+
+
+def extract_preferred_outstanding_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
+    rows = []
+    pattern = re.compile(
+        r"(?P<shares>\d[\d,]*)\s+shares\s+have\s+been\s+designated\s+"
+        r"(?P<series>Series\s+[A-Za-z0-9-]+\s+Preferred\s+Stock),\s+"
+        r"(?P<status>all|none)\s+of\s+which\s+are\s+issued\s+and\s+outstanding",
+        flags=re.IGNORECASE,
+    )
+    for match in pattern.finditer(text):
+        if match.group("status").lower() != "all":
+            continue
+        series = normalize_security_name(match.group("series"))
+        rows.append(captable_row(f"Existing {series} holders", series, match.group("shares"), document_id, location))
+    return rows
+
+
+def extract_stock_plan_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
+    if "stock plan" not in text.lower():
+        return []
+
+    rows = []
+    options_match = re.search(
+        r"options\s+to\s+purchase\s+(?P<shares>\d[\d,]*)\s+shares\s+have\s+been\s+granted\s+and\s+are\s+currently\s+outstanding",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if options_match:
+        rows.append(captable_row("Optionholders", "Common Stock Options", options_match.group("shares"), document_id, location))
+
+    available_match = re.search(
+        r"(?P<shares>\d[\d,]*)\s+shares\s+of\s+Common\s+Stock\s+remain\s+available\s+for\s+issuance",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if available_match:
+        rows.append(
+            captable_row("Unallocated option pool", "Common Stock Reserved", available_match.group("shares"), document_id, location)
+        )
+
+    return rows
+
+
+def extract_minimum_closing_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
+    match = re.search(
+        r"minimum\s+of\s+(?P<shares>\d[\d,]*)\s+Shares\s+must\s+be\s+sold\s+at\s+the\s+Initial\s+Closing",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return []
+    return [
+        captable_row(
+            "Series A purchasers (minimum closing)",
+            "Series A Preferred Stock",
+            match.group("shares"),
+            document_id,
+            location,
+        )
+    ]
+
+
+def extract_llm_share_rows(raw: dict[str, Any], title: str, document_id: str) -> list[dict[str, Any]]:
+    financing_terms = raw.get("financing_terms", {}) if isinstance(raw.get("financing_terms"), dict) else {}
+    share_amounts = financing_terms.get("share_amounts", [])
+    if not isinstance(share_amounts, list):
+        return []
+
+    rows = []
+    for index, value in enumerate(share_amounts[:10], start=1):
+        shares = parse_number(json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else str(value))
+        if shares < MIN_CAPTABLE_SHARE_COUNT:
+            continue
+        holder = extract_named_value(value, ["holder", "purchaser", "stockholder", "party"]) or f"Extracted holder {index}"
+        security = extract_named_value(value, ["security", "security_class", "class", "series"]) or infer_security_type(title)
+        source = extract_named_value(value, ["source", "sourceLocation", "source_location"]) or "LLM financing terms"
+        rows.append(captable_row(holder, security, shares, document_id, source))
+    return dedupe_captable_rows(rows)
+
+
+def captable_row(holder: str, security: str, shares: str | float, document_id: str, location: str) -> dict[str, Any]:
+    parsed_shares = parse_number(str(shares))
+    if parsed_shares < MIN_CAPTABLE_SHARE_COUNT:
+        parsed_shares = 0
+    return {
+        "holder": holder,
+        "security": security,
+        "shares": parsed_shares,
+        "document_id": document_id,
+        "location": location,
+    }
+
+
+def dedupe_captable_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped = []
+    seen: set[tuple[str, str, float]] = set()
+    for row in rows:
+        if row["shares"] <= 0:
+            continue
+        key = (row["holder"].lower(), row["security"].lower(), row["shares"])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    return deduped
+
+
+def clean_capitalization_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.replace("\xa0", " ")).strip()
+
+
+def normalize_security_name(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().replace("seed", "Seed")
+
+
+def extract_named_value(value: Any, keys: list[str]) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    for key in keys:
+        item = value.get(key)
+        if item:
+            return str(item)
+    evidence = value.get("evidence")
+    if isinstance(evidence, list) and evidence:
+        first = evidence[0]
+        if isinstance(first, dict) and first.get("paragraph_id") is not None:
+            return f"paragraph {first['paragraph_id']}"
+    return None
 
 
 def build_index_from_db(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:

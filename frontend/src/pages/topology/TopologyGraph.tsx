@@ -10,10 +10,11 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { motion } from "framer-motion";
-import { History, Network, Split, UploadCloud } from "lucide-react";
+import { Download, History, Network, Split, UploadCloud } from "lucide-react";
 import { useMemo, useState } from "react";
 import { NodeDetailPortal } from "../../components/topology/NodeDetailPortal";
 import { useWorkbench } from "../../context/WorkbenchContext";
+import { downloadCapTableCsv } from "../../utils/captableExport";
 import { cn } from "../../utils/cn";
 import { DocumentNode, EventNode, CapTableRowNode } from "./CustomNodes";
 
@@ -151,6 +152,10 @@ export function TopologyGraph() {
 
     return snapshot.topology.nodes.filter((node) => node.nodeType === "captable_version");
   }, [snapshot]);
+  const captableByNodeId = useMemo(
+    () => new Map((snapshot?.captableVersions ?? []).map((version) => [version.topologyNodeId, version])),
+    [snapshot],
+  );
 
   const handleNodeClick: NodeMouseHandler = async (_, node) => {
     await selectNode(node.id);
@@ -210,21 +215,39 @@ export function TopologyGraph() {
         <div className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-sm backdrop-blur">
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Viewing version rail</div>
           <div className="mt-4 flex flex-wrap gap-3">
-            {versionNodes.map((node) => (
-              <button
-                key={node.id}
-                onClick={() => void setViewingVersion(node.id)}
-                className={cn(
-                  "rounded-2xl border px-4 py-3 text-left transition",
-                  snapshot?.topology.currentViewingNodeId === node.id
-                    ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white",
-                )}
-              >
-                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">{node.status}</div>
-                <div className="mt-2 text-sm font-semibold">{node.label}</div>
-              </button>
-            ))}
+            {versionNodes.map((node) => {
+              const version = captableByNodeId.get(node.id);
+
+              return (
+                <div
+                  key={node.id}
+                  className={cn(
+                    "flex overflow-hidden rounded-2xl border text-left transition",
+                    snapshot?.topology.currentViewingNodeId === node.id
+                      ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm"
+                      : "border-slate-200 bg-slate-50 text-slate-700",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => void setViewingVersion(node.id)}
+                    className="px-4 py-3 text-left transition hover:bg-white"
+                  >
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">{node.status}</div>
+                    <div className="mt-2 text-sm font-semibold">{node.label}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => version && snapshot ? downloadCapTableCsv(version, snapshot.documents) : undefined}
+                    disabled={!version}
+                    className="border-l border-slate-200 px-3 text-slate-500 transition hover:bg-white hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`Download ${node.label}`}
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -270,6 +293,7 @@ export function TopologyGraph() {
         <NodeDetailPortal
           detail={portalNodeId ? selectedNodeDetail : null}
           loading={detailLoading}
+          documents={snapshot?.documents ?? []}
           onClose={() => setPortalNodeId(null)}
           onMerge={(nodeId) => void mergeNode(nodeId)}
           onReject={(nodeId) => void rejectNode(nodeId)}

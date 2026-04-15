@@ -2,14 +2,16 @@ import { motion } from "framer-motion";
 import {
   Archive,
   CheckCircle2,
+  Download,
   FileText,
   GitBranch,
   History,
   ShieldAlert,
   XCircle,
 } from "lucide-react";
-import type { TopologyNodeStatus } from "../../types/topology";
+import type { DocumentMeta, TopologyNodeStatus } from "../../types/topology";
 import type { TopologyNodeDetail } from "../../types/topology";
+import { downloadCapTableCsv } from "../../utils/captableExport";
 import { cn } from "../../utils/cn";
 
 const statusStyles: Record<TopologyNodeStatus, string> = {
@@ -31,6 +33,7 @@ interface NodeDetailPortalProps {
   onReject: (nodeId: string) => void;
   onArchive: (nodeId: string) => void;
   onViewVersion: (nodeId: string) => void;
+  documents: DocumentMeta[];
 }
 
 export function NodeDetailPortal({
@@ -41,6 +44,7 @@ export function NodeDetailPortal({
   onReject,
   onArchive,
   onViewVersion,
+  documents,
 }: NodeDetailPortalProps) {
   if (!detail) {
     return (
@@ -195,8 +199,20 @@ export function NodeDetailPortal({
               <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Cap Table 版本</div>
             </div>
             <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-base font-semibold text-slate-950">{detail.captableVersion.versionName}</div>
-              <div className="mt-2 text-sm leading-6 text-slate-600">{detail.captableVersion.summary}</div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-semibold text-slate-950">{detail.captableVersion.versionName}</div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">{detail.captableVersion.summary}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadCapTableCsv(detail.captableVersion!, documents)}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                >
+                  <Download className="h-4 w-4" />
+                  CSV
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {detail.captableVersion.rows.map((row) => (
