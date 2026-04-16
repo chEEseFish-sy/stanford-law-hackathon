@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Process Series A DOCX files into structured JSON.
 
-The script reads DOCX files from data_process, extracts local candidates, and
+The script reads DOCX files from data/, extracts local candidates, and
 optionally calls Gemini to produce document-level structured data.
 """
 
@@ -20,8 +20,8 @@ from typing import Any
 from xml.etree import ElementTree
 
 
-DEFAULT_INPUT_DIR = Path("data_process")
-DEFAULT_OUTPUT_DIR = Path("processed_data")
+DEFAULT_INPUT_DIR = Path("data")
+DEFAULT_OUTPUT_DIR = Path("storage")
 DEFAULT_MODEL = "gemini-3-flash-preview"
 MAX_CHUNK_CHARS = 18000
 DEFAULT_TASKS = ["metadata", "dates", "financing", "rights", "risks"]
@@ -425,7 +425,7 @@ class GeminiExtractor:
         except ImportError as exc:
             raise RuntimeError(
                 "Missing Gemini SDK. Install dependencies with: "
-                "python3 -m pip install -r requirements.txt"
+                "python3 -m pip install -r backend/requirements.txt"
             ) from exc
 
         self.client = genai.Client(api_key=api_key)
@@ -862,7 +862,7 @@ def main(argv: list[str]) -> int:
         and result["processing_metadata"].get("status") == "failed"
     ]
     if failures:
-        print(f"{len(failures)} file(s) failed. See processed_data/index.json.", file=sys.stderr)
+        print(f"{len(failures)} file(s) failed. See storage/index.json.", file=sys.stderr)
         return 2
     if failed_results:
         print(

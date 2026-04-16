@@ -16,29 +16,54 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from process_docx_data import (
-    DEFAULT_INPUT_DIR,
-    DEFAULT_MODEL,
-    DEFAULT_OUTPUT_DIR,
-    DEFAULT_TASKS,
-    build_index,
-    iter_input_files,
-    load_dotenv_if_available,
-    process_file,
-    safe_stem,
-    write_json,
-)
-from workbench_store import (
-    DEFAULT_CASE_ID,
-    build_index_from_db,
-    build_workbench_snapshot,
-    get_node_detail,
-    ingest_processed_result,
-    init_store,
-    merge_node,
-    set_viewing_version,
-    update_node_status,
-)
+try:
+    from .process_docx_data import (
+        DEFAULT_INPUT_DIR,
+        DEFAULT_MODEL,
+        DEFAULT_OUTPUT_DIR,
+        DEFAULT_TASKS,
+        build_index,
+        iter_input_files,
+        load_dotenv_if_available,
+        process_file,
+        safe_stem,
+        write_json,
+    )
+    from .workbench_store import (
+        DEFAULT_CASE_ID,
+        build_index_from_db,
+        build_workbench_snapshot,
+        get_node_detail,
+        ingest_processed_result,
+        init_store,
+        merge_node,
+        set_viewing_version,
+        update_node_status,
+    )
+except ImportError:
+    from process_docx_data import (
+        DEFAULT_INPUT_DIR,
+        DEFAULT_MODEL,
+        DEFAULT_OUTPUT_DIR,
+        DEFAULT_TASKS,
+        build_index,
+        iter_input_files,
+        load_dotenv_if_available,
+        process_file,
+        safe_stem,
+        write_json,
+    )
+    from workbench_store import (
+        DEFAULT_CASE_ID,
+        build_index_from_db,
+        build_workbench_snapshot,
+        get_node_detail,
+        ingest_processed_result,
+        init_store,
+        merge_node,
+        set_viewing_version,
+        update_node_status,
+    )
 
 ROOT_DIR = SCRIPT_DIR.parent
 DEFAULT_INPUT_DIR = (ROOT_DIR / DEFAULT_INPUT_DIR).resolve() if not DEFAULT_INPUT_DIR.is_absolute() else DEFAULT_INPUT_DIR

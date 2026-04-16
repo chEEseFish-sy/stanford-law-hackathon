@@ -19,12 +19,25 @@
 | `08-feedback-form.md` | 内测访谈与反馈表 | 产品 / 业务 |
 | `09-technical-roadmap.md` | 从原型到内测产品的技术路线 | 技术 |
 | `10-demo-script.md` | 对内/对外演示脚本 | 产品 / 业务 |
+| `11-code-structure.md` | 当前推荐的前后端、数据层代码结构说明 | 技术 |
+| `topology.md` | topology 模块的技术设计说明 | 技术 |
 
 ## 当前统一产品方向
 
 VeriCap 是面向融资、股权和公司法业务场景的 AI 辅助股权文件审计工作台。它帮助法律和财务专业人员上传融资交易文件，抽取股权相关证据，重建 working cap table，并以证据链方式提示不一致、缺失和低置信度事项。
 
-内测产品应收敛为单页 Evidence Workspace，而不是继续扩展成泛化多页面 dashboard。现有 dashboard、evidence、timeline、cap table、topology 等模块可以作为底层实现组件保留，但用户侧 Beta 流程应聚焦在一个工作台里完成：文档证据、版本对比、历史回溯、文件列表、AI 解释和 working cap table 复核。
+内测产品应收敛为单页 `Evidence Workspace`，而不是继续扩展为泛化多页面 dashboard。用户侧 Beta 流程应聚焦在一个工作台中完成：文档证据查看、版本对比、历史回溯、文件列表、AI 解释和 working cap table 复核。
+
+## 建议阅读顺序
+
+如果你是第一次进入这个仓库，建议按下面的顺序阅读：
+
+1. `00-product-brief.md`：先理解产品定位。
+2. `01-beta-scope.md`：明确当前范围和非目标。
+3. `03-core-workflow.md`：理解端到端业务流程。
+4. `04-prd.md`：查看功能需求和验收标准。
+5. `09-technical-roadmap.md`：理解技术演进方向。
+6. `11-code-structure.md`：理解代码组织、模块职责和模块关系。
 
 ## 后续 AI 开发规则
 

@@ -1,100 +1,99 @@
 # VeriCap
 
-VeriCap is an AI-assisted cap table audit workbench for startup financing diligence. It helps legal and finance teams upload venture financing documents, extract equity-related evidence, reconstruct a working cap table, and review inconsistencies through an evidence-backed topology view.
+VeriCap 是一个面向创业公司融资尽调场景的 AI 辅助 cap table 审计工作台。它帮助法律和财务团队上传融资文件，抽取股权相关证据，重建 working cap table，并通过可追溯的证据链和版本关系来复核不一致问题。
 
-The current prototype includes:
+当前原型包含：
 
-- A React/Vite frontend workbench
-- A FastAPI local backend
-- A DOCX processing pipeline
-- A SQLite-backed workspace store
-- Demo data and processed sample outputs
-- Optional Gemini-powered extraction through `LLM_API_KEY`
+- React / Vite 前端工作台
+- FastAPI 本地后端
+- DOCX 处理流水线
+- SQLite 工作台存储
+- 样例数据与已处理结果
+- 通过 `LLM_API_KEY` 启用的可选 LLM 抽取能力
 
-## What VeriCap Does
+## VeriCap 做什么
 
-VeriCap is designed for startup financing lawyers, paralegals, founders, and finance operators who need to verify whether a company's cap table is supported by its legal documents.
+VeriCap 面向融资律师、律师助理、创始人和财务运营人员，帮助他们判断公司的 cap table 是否能够被法律文件支持。
 
-Core workflow:
+核心流程如下：
 
-1. Upload DOCX transaction documents.
-2. Extract dates, parties, financing terms, rights, risks, and cap table signals.
-3. Convert extracted evidence into structured document records.
-4. Generate or update a topology graph that tracks finalized documents, drafts, branches, rejected items, merged nodes, and cap table versions.
-5. Review the current working cap table and trace each result back to source evidence.
+1. 上传融资交易文件。
+2. 抽取日期、主体、融资条款、权利、风险和 cap table 相关信号。
+3. 将抽取结果整理为结构化文档记录和证据记录。
+4. 生成或更新 topology 结构，用于表达定稿、草稿、分支、驳回、合并和版本关系。
+5. 在工作台中复核当前 working cap table，并将关键结果追溯到来源证据。
 
-VeriCap is an audit copilot. It does not provide final legal conclusions or replace attorney review.
+VeriCap 是审计辅助工具，不提供最终法律结论，也不能替代律师复核。
 
-## Repository Structure
+## 仓库结构
 
 ```text
 .
-├── data_process/           # Uploaded or source DOCX files
-├── frontend/               # React + Vite frontend
-├── idea_setup/             # Product idea notes
-├── processed_data/         # Extracted JSON, index, and SQLite database
-├── product-design/         # Product design documents
-├── scripts/                # FastAPI server, DOCX processor, SQLite store
-├── test_doc/               # Sample DOCX files for testing
-├── tool/                   # Supporting generation/extraction tools
-├── topology.md             # Topology module technical design
-└── requirements.txt        # Python dependencies
+├── backend/                # FastAPI 后端、DOCX 处理流程、SQLite 存储、Python 依赖
+├── data/                   # 输入样例文件和上传源文件
+├── docs/                   # 产品、技术和架构文档
+├── frontend/               # React + Vite 前端工作台
+├── scripts/                # 一次性辅助脚本
+├── storage/                # 处理后的 JSON、索引、SQLite 和导出产物
+├── tests/                  # 自动化测试
+├── tool/                   # 辅助生成与提取工具
+└── topology.md             # 拓扑模块技术设计文档
 ```
 
-## Prerequisites
+## 运行前准备
 
-Install the following before running the project:
+运行项目之前，请先安装：
 
 - Python 3.10+
 - Node.js 18+
 - npm
 
-Optional:
+可选：
 
-- A Gemini API key if you want LLM-based extraction. Without it, the system still runs with local extraction fallbacks and demo data.
+- 如果需要启用 LLM 抽取，请准备可用的 `LLM_API_KEY`。如果未配置，系统会回退到本地规则抽取和演示数据。
 
-## Environment Setup
+## 环境变量
 
-Create a local `.env` file in the repository root if you want LLM extraction:
+如果需要启用 LLM 抽取，可在仓库根目录创建 `.env` 文件：
 
 ```bash
 LLM_API_KEY=your_api_key_here
 LLM_MODEL_NAME=gemini-3-flash-preview
 ```
 
-If `LLM_API_KEY` is missing, the backend will fall back to deterministic local extraction for uploads and chat responses.
+如果没有提供 `LLM_API_KEY`，后端会在上传处理和聊天解释中回退到本地确定性逻辑。
 
-## Backend Setup
+## 后端启动
 
-From the repository root:
+在仓库根目录执行：
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -r requirements.txt
+python3 -m pip install -r backend/requirements.txt
 ```
 
-Start the FastAPI backend:
+启动 FastAPI 后端：
 
 ```bash
-uvicorn scripts.api_server:app --reload --host 127.0.0.1 --port 8000
+uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Health check:
+健康检查：
 
 ```bash
 curl http://127.0.0.1:8000/api/health
 ```
 
-Expected response:
+预期返回：
 
 ```json
 {"status":"ok"}
 ```
 
-## Frontend Setup
+## 前端启动
 
-Open a second terminal and run:
+打开第二个终端并执行：
 
 ```bash
 cd frontend
@@ -102,62 +101,61 @@ npm install
 npm run dev
 ```
 
-The Vite app will usually run at:
+Vite 默认通常运行在：
 
 ```text
 http://localhost:5173
 ```
 
-The frontend reads the backend from `http://127.0.0.1:8000` by default. To use a different backend URL, create `frontend/.env.local`:
+前端默认读取 `http://127.0.0.1:8000` 作为后端地址。如果要改成其他地址，请创建 `frontend/.env.local`：
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-## How To Use The App
+## 如何使用
 
-1. Start the backend.
-2. Start the frontend.
-3. Open the Vite URL in your browser.
-4. Use the `Dashboard` tab to review the current workspace, topology graph, evidence state, and working cap table.
-5. Use the `Document Intake` tab to upload one or more `.docx` transaction documents.
-6. Click `Save and process`.
-7. After processing, return to the dashboard to review:
-   - Uploaded document records
-   - Extracted evidence
-   - Topology updates
-   - Working cap table versions
-   - Merge, reject, archive, and view actions for topology nodes
+1. 启动后端。
+2. 启动前端。
+3. 在浏览器打开 Vite 地址。
+4. 进入工作台页面。
+5. 在左侧或文件区域上传一个或多个融资文件。
+6. 等待系统完成处理后，在工作台中查看：
+   - 上传文件和文件状态
+   - 抽取出来的证据内容
+   - topology 和版本关系
+   - 当前 working cap table
+   - 节点的 merge、reject、archive、view 等操作
 
-Only `.docx` files are currently supported by the upload flow.
+当前上传链路仍以 `.docx` 文件为主。
 
-## Processing Existing Documents
+## 处理已有样例文件
 
-The repository already includes sample documents in `data_process/` and `test_doc/`.
+仓库已经在 `data/` 中提供了样例文件。
 
-To process all files in `data_process/` without LLM calls:
-
-```bash
-python3 scripts/process_docx_data.py --input data_process --output processed_data
-```
-
-To process one file:
+如果希望在不调用 LLM 的情况下处理 `data/` 中所有文件：
 
 ```bash
-python3 scripts/process_docx_data.py --file "test_doc/Series A Stock Purchase Agreement .docx" --output processed_data
+python3 backend/process_docx_data.py --input data --output storage
 ```
 
-To use Gemini extraction:
+如果只处理单个文件：
 
 ```bash
-python3 scripts/process_docx_data.py --input data_process --output processed_data --llm
+python3 backend/process_docx_data.py --file "data/Series A Stock Purchase Agreement .docx" --output storage
 ```
 
-Processed outputs are written to `processed_data/` as JSON files, with an `index.json` summary.
+如果希望启用 LLM 抽取：
 
-## API Endpoints
+```bash
+python3 backend/process_docx_data.py --input data --output storage --llm
+```
 
-Useful local endpoints:
+处理结果会写入 `storage/`，并生成 `index.json` 汇总文件。
+
+## API 接口
+
+当前本地可用的主要接口如下：
 
 ```text
 GET  /api/health
@@ -170,18 +168,18 @@ POST /api/topology/nodes/{node_id}/merge
 POST /api/topology/nodes/{node_id}/reject
 POST /api/topology/nodes/{node_id}/archive
 POST /api/cases/{case_id}/viewing-version
-POST /api/cases/{case_id}/chat
+POST /api/process
 ```
 
-The default case ID is:
+默认 case ID 为：
 
 ```text
 case-default
 ```
 
-## Development Commands
+## 常用开发命令
 
-Frontend:
+前端：
 
 ```bash
 cd frontend
@@ -191,23 +189,23 @@ npm run lint
 npm run preview
 ```
 
-Backend:
+后端：
 
 ```bash
-uvicorn scripts.api_server:app --reload --host 127.0.0.1 --port 8000
-python3 scripts/process_docx_data.py --input data_process --output processed_data
+uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000
+python3 backend/process_docx_data.py --input data --output storage
 ```
 
-## Data Notes
+## 数据说明
 
-- Uploaded DOCX files are saved into `data_process/`.
-- Structured extraction results are saved into `processed_data/`.
-- The SQLite workbench database is stored at `processed_data/vericap.sqlite3`.
-- If the backend is unavailable, the frontend falls back to bundled demo data.
+- 上传或样例 DOCX 文件保存在 `data/`。
+- 结构化抽取结果保存在 `storage/`。
+- SQLite 工作台数据库位于 `storage/vericap.sqlite3`。
+- 如果后端不可用，前端会回退到内置演示数据。
 
-## Current Limitations
+## 当前限制
 
-- Uploads support `.docx` only.
-- The cap table is a working audit view, not a final legal determination.
-- LLM extraction depends on the configured model and API key.
-- Complex securities, multi-jurisdiction legal rules, and final legal opinions are outside the current prototype scope.
+- 上传链路主要支持 `.docx`。
+- cap table 结果是 working audit view，不是最终法律结论。
+- LLM 抽取能力依赖模型配置和 API Key。
+- 复杂证券设计、多法域分析和最终法律意见不在当前原型范围内。

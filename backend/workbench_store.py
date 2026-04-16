@@ -11,13 +11,16 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from process_docx_data import safe_stem
+try:
+    from .process_docx_data import safe_stem
+except ImportError:
+    from process_docx_data import safe_stem
 
 
 DEFAULT_CASE_ID = "case-default"
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_DIR = ROOT_DIR / "data_process"
-DEFAULT_OUTPUT_DIR = ROOT_DIR / "processed_data"
+DEFAULT_INPUT_DIR = ROOT_DIR / "data"
+DEFAULT_OUTPUT_DIR = ROOT_DIR / "storage"
 DB_PATH = DEFAULT_OUTPUT_DIR / "vericap.sqlite3"
 MIN_CAPTABLE_SHARE_COUNT = 1_000
 
