@@ -1,7 +1,7 @@
 name: Feishu Push Notification
 on:
   push:
-    branches: [ "main", "master" ]  # 改成你实际的主分支名，比如有的项目是 main，有的是 master
+    branches: [ "main", "feature-wang-update" ]  # 改成你实际的主分支名，比如有的项目是 main，有的是 master
 jobs:
   send-to-feishu:
     runs-on: ubuntu-latest
