@@ -28,31 +28,19 @@ jobs:
           python3 <<'PY' > payload.json
           import json
           import os
+          text = (
+              "GitHub 提交通知\n"
+              f"仓库：{os.environ['REPOSITORY']}\n"
+              f"分支：{os.environ['BRANCH']}\n"
+              f"提交人：{os.environ['ACTOR']}\n"
+              f"提交信息：{os.environ['COMMIT_MESSAGE']}\n"
+              f"提交链接：{os.environ['COMMIT_URL']}"
+          )
 
           payload = {
-              "msg_type": "interactive",
-              "card": {
-                  "config": {"wide_screen_mode": True},
-                  "header": {
-                      "template": "blue",
-                      "title": {"content": "📦 新的代码提交", "tag": "plain_text"},
-                  },
-                  "elements": [
-                      {
-                          "div": {
-                              "text": {
-                                  "tag": "lark_md",
-                                  "content": (
-                                      f"**仓库**：{os.environ['REPOSITORY']}\n"
-                                      f"**分支**：{os.environ['BRANCH']}\n"
-                                      f"**提交人**：{os.environ['ACTOR']}\n"
-                                      f"**提交信息**：{os.environ['COMMIT_MESSAGE']}\n"
-                                      f"**提交链接**：{os.environ['COMMIT_URL']}"
-                                  ),
-                              }
-                          }
-                      }
-                  ],
+              "msg_type": "text",
+              "content": {
+                  "text": text,
               },
           }
 
@@ -75,3 +63,18 @@ jobs:
             echo "Feishu webhook request failed."
             exit 1
           fi
+
+      - name: Validate Feishu business response
+        run: |
+          python3 <<'PY'
+          import json
+          from pathlib import Path
+
+          response = json.loads(Path("response.json").read_text(encoding="utf-8"))
+          code = response.get("code")
+          if code != 0:
+              print("Feishu business error:", response)
+              raise SystemExit(1)
+
+          print("Feishu push succeeded:", response)
+          PY
