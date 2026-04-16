@@ -1,35 +1,77 @@
 name: Feishu Push Notification
 on:
   push:
-    branches: [ "main", "feature-wang-update" ]  # 改成你实际的主分支名，比如有的项目是 main，有的是 master
+  workflow_dispatch:
+
 jobs:
   send-to-feishu:
     runs-on: ubuntu-latest
     steps:
-      - name: Send message to Feishu group
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ secrets.FEISHU_WEBHOOK }}
-          method: POST
-          contentType: 'application/json'
-          data: |
-            {
+      - name: Validate Feishu webhook secret
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        run: |
+          if [ -z "$FEISHU_WEBHOOK" ]; then
+            echo "FEISHU_WEBHOOK secret is not configured."
+            exit 1
+          fi
+
+      - name: Build Feishu payload
+        id: payload
+        env:
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title || 'Manual workflow dispatch' }}
+          COMMIT_URL: ${{ github.event.head_commit.url || github.server_url }}
+        run: |
+          python3 <<'PY' > payload.json
+          import json
+          import os
+
+          payload = {
               "msg_type": "interactive",
               "card": {
-                "config": {"wide_screen_mode": true},
-                "header": {
-                  "template": "blue",
-                  "title": {"content": "📦 新的代码提交", "tag": "plain_text"}
-                },
-                "elements": [
-                  {
-                    "div": {
-                      "text": {
-                        "tag": "lark_md",
-                        "content": "**仓库**：${{ github.repository }}\n**分支**：${{ github.ref_name }}\n**提交人**：${{ github.actor }}\n**提交信息**：${{ github.event.head_commit.message }}\n**提交链接**：${{ github.event.head_commit.url }}"
+                  "config": {"wide_screen_mode": True},
+                  "header": {
+                      "template": "blue",
+                      "title": {"content": "📦 新的代码提交", "tag": "plain_text"},
+                  },
+                  "elements": [
+                      {
+                          "div": {
+                              "text": {
+                                  "tag": "lark_md",
+                                  "content": (
+                                      f"**仓库**：{os.environ['REPOSITORY']}\n"
+                                      f"**分支**：{os.environ['BRANCH']}\n"
+                                      f"**提交人**：{os.environ['ACTOR']}\n"
+                                      f"**提交信息**：{os.environ['COMMIT_MESSAGE']}\n"
+                                      f"**提交链接**：{os.environ['COMMIT_URL']}"
+                                  ),
+                              }
+                          }
                       }
-                    }
-                  }
-                ]
-              }
-            }
+                  ],
+              },
+          }
+
+          print(json.dumps(payload, ensure_ascii=False))
+          PY
+
+      - name: Send message to Feishu group
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        run: |
+          http_code=$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST "$FEISHU_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            --data @payload.json)
+
+          echo "Feishu response code: $http_code"
+          cat response.json
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Feishu webhook request failed."
+            exit 1
+          fi
