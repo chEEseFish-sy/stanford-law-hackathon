@@ -37,6 +37,48 @@ button {
   cursor: pointer;
 }
 
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.docx-page-reader {
+  overscroll-behavior: contain;
+}
+
+.docx-page-reader .word-document-shell-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.docx-page-reader .word-document-shell-wrapper > section.word-document-shell {
+  margin: 0 auto !important;
+  background: #fff !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22) !important;
+  transform: scale(1.1);
+  transform-origin: top center;
+}
+
+.docx-page-reader section.word-document-shell {
+  max-width: 100%;
+}
+
+.docx-page-reader section.word-document-shell > article,
+.docx-page-reader section.word-document-shell > header,
+.docx-page-reader section.word-document-shell > footer {
+  background: #fff !important;
+}
+
+.docx-page-reader .word-document-shell-wrapper > section.word-document-shell::before,
+.docx-page-reader .word-document-shell-wrapper > section.word-document-shell::after {
+  background: transparent !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

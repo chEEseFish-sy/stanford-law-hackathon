@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-04-13T02:23:26.384250+00:00",
-  "document_count": 11,
+  "generated_at": "2026-04-19T23:21:20.351234+00:00",
+  "document_count": 7,
   "documents": [
     {
-      "source_file": "Series A - A&R Investors' Rights Agreement.docx",
-      "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
+      "source_file": "Second Amendment to Equity Incentive Plan(1).docx",
+      "document_title": "SECOND AMENDMENT TO A INC. 2023 EQUITY INCENTIVE PLAN",
       "document_type": "",
       "key_dates": [],
       "main_parties": [],
       "confidence": 0.0,
       "status": "candidates_ready",
-      "output_file": "series_a_a_r_investors_rights_agreement.json"
+      "output_file": "second_amendment_to_equity_incentive_plan_1.json"
     },
     {
-      "source_file": "Series A - A&R Investors' Rights Agreement_1.docx",
+      "source_file": "Series A - A&R Investors' Rights Agreement(1).docx",
       "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
       "document_type": "",
       "key_dates": [],
@@ -23,37 +23,7 @@
       "output_file": "series_a_a_r_investors_rights_agreement_1.json"
     },
     {
-      "source_file": "Series A - A&R Investors' Rights Agreement_2.docx",
-      "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
-      "document_type": "",
-      "key_dates": [],
-      "main_parties": [],
-      "confidence": 0.0,
-      "status": "candidates_ready",
-      "output_file": "series_a_a_r_investors_rights_agreement_2.json"
-    },
-    {
-      "source_file": "Series A - A&R Investors' Rights Agreement_3.docx",
-      "document_title": "AMENDED AND RESTATED INVESTORS’ RIGHTS AGREEMENT",
-      "document_type": "",
-      "key_dates": [],
-      "main_parties": [],
-      "confidence": 0.0,
-      "status": "candidates_ready",
-      "output_file": "series_a_a_r_investors_rights_agreement_3.json"
-    },
-    {
-      "source_file": "Series A A&R Right of First Refusal and Co-Sale Agreement .docx",
-      "document_title": "AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT",
-      "document_type": "",
-      "key_dates": [],
-      "main_parties": [],
-      "confidence": 0.0,
-      "status": "candidates_ready",
-      "output_file": "series_a_a_r_right_of_first_refusal_and_co_sale_agreement.json"
-    },
-    {
-      "source_file": "Series A A&R Right of First Refusal and Co-Sale Agreement _1.docx",
+      "source_file": "Series A A&R Right of First Refusal and Co-Sale Agreement (1).docx",
       "document_title": "AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT",
       "document_type": "",
       "key_dates": [],
@@ -63,27 +33,7 @@
       "output_file": "series_a_a_r_right_of_first_refusal_and_co_sale_agreement_1.json"
     },
     {
-      "source_file": "Series A A&R Right of First Refusal and Co-Sale Agreement _2.docx",
-      "document_title": "AMENDED AND RESTATED RIGHT OF FIRST REFUSAL AND CO-SALE AGREEMENT",
-      "document_type": "",
-      "key_dates": [],
-      "main_parties": [],
-      "confidence": 0.0,
-      "status": "candidates_ready",
-      "output_file": "series_a_a_r_right_of_first_refusal_and_co_sale_agreement_2.json"
-    },
-    {
-      "source_file": "Series A A&R Voting Agreement.docx",
-      "document_title": "AMENDED AND RESTATED VOTING AGREEMENT",
-      "document_type": "",
-      "key_dates": [],
-      "main_parties": [],
-      "confidence": 0.0,
-      "status": "candidates_ready",
-      "output_file": "series_a_a_r_voting_agreement.json"
-    },
-    {
-      "source_file": "Series A A&R Voting Agreement_1.docx",
+      "source_file": "Series A A&R Voting Agreement(1).docx",
       "document_title": "AMENDED AND RESTATED VOTING AGREEMENT",
       "document_type": "",
       "key_dates": [],
@@ -103,14 +53,24 @@
       "output_file": "series_a_stock_purchase_agreement.json"
     },
     {
-      "source_file": "Series A Stock Purchase Agreement _1.docx",
-      "document_title": "SERIES A PREFERRED STOCK PURCHASE AGREEMENT",
+      "source_file": "Series B Closing Checklist.docx",
+      "document_title": "A – Series A Preferred Closing Checklist",
       "document_type": "",
       "key_dates": [],
       "main_parties": [],
       "confidence": 0.0,
       "status": "candidates_ready",
-      "output_file": "series_a_stock_purchase_agreement_1.json"
+      "output_file": "series_b_closing_checklist.json"
+    },
+    {
+      "source_file": "Written Consent of the Board of Directors (Series A Financing) .docx",
+      "document_title": "A INC.",
+      "document_type": "",
+      "key_dates": [],
+      "main_parties": [],
+      "confidence": 0.0,
+      "status": "candidates_ready",
+      "output_file": "written_consent_of_the_board_of_directors_series_a_financing.json"
     }
   ]
 }

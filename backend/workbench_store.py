@@ -23,6 +23,7 @@ DEFAULT_INPUT_DIR = ROOT_DIR / "data"
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "storage"
 DB_PATH = DEFAULT_OUTPUT_DIR / "vericap.sqlite3"
 MIN_CAPTABLE_SHARE_COUNT = 1_000
+ROOT_FOLDER_NAME = "Root"
 
 
 def utc_now() -> str:
@@ -134,8 +135,17 @@ def init_store() -> None:
               description TEXT NOT NULL,
               created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS case_messages (
+              id TEXT PRIMARY KEY,
+              case_id TEXT NOT NULL REFERENCES cases(id),
+              role TEXT NOT NULL,
+              content TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            );
             """
         )
+        ensure_column(conn, "files", "relative_path", "TEXT")
 
     seed_if_empty()
     rebuild_generated_captables()
@@ -148,30 +158,6 @@ def seed_if_empty() -> None:
         return
 
     create_case(DEFAULT_CASE_ID, "Default financing audit")
-    index_path = DEFAULT_OUTPUT_DIR / "index.json"
-    if not index_path.exists():
-        return
-
-    try:
-        index = json.loads(index_path.read_text(encoding="utf-8"))
-    except Exception:
-        return
-
-    for item in index.get("documents", []):
-        output_file = DEFAULT_OUTPUT_DIR / str(item.get("output_file", ""))
-        if not output_file.exists():
-            continue
-        try:
-            result = json.loads(output_file.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        source_file = str(result.get("source_file") or item.get("source_file") or output_file.name)
-        ingest_processed_result(
-            case_id=DEFAULT_CASE_ID,
-            result=result,
-            source_path=str(DEFAULT_INPUT_DIR / source_file),
-            stable_id=f"file-{safe_stem(Path(source_file))}",
-        )
 
 
 def create_case(case_id: str, name: str) -> None:
@@ -191,6 +177,7 @@ def ingest_processed_result(
     case_id: str,
     result: dict[str, Any],
     source_path: str,
+    relative_path: str | None = None,
     stable_id: str | None = None,
 ) -> dict[str, Any]:
     create_case(case_id, "Default financing audit")
@@ -209,8 +196,8 @@ def ingest_processed_result(
             """
             INSERT INTO files
             (id, case_id, file_name, file_type, transaction_date, uploaded_at, source_path,
-             storage_provider, processing_status, evidence_status, summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?)
+             relative_path, storage_provider, processing_status, evidence_status, summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?)
             """,
             (
                 document_id,
@@ -220,6 +207,7 @@ def ingest_processed_result(
                 transaction_date,
                 now,
                 source_path,
+                normalize_relative_path(relative_path),
                 processing_status,
                 evidence_status,
                 summary,
@@ -415,6 +403,18 @@ def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
             }
             for row in conn.execute("SELECT * FROM operation_logs WHERE case_id = ? ORDER BY created_at DESC LIMIT 50", (case_id,))
         ]
+        messages = [
+            {
+                "id": row["id"],
+                "role": row["role"],
+                "content": row["content"],
+                "createdAt": row["created_at"],
+            }
+            for row in conn.execute(
+                "SELECT * FROM case_messages WHERE case_id = ? ORDER BY created_at, rowid",
+                (case_id,),
+            )
+        ]
 
     current_trunk = case["current_trunk_node_id"] or (nodes[-1]["id"] if nodes else "")
     current_viewing = case["current_viewing_node_id"] or current_trunk
@@ -435,9 +435,174 @@ def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
         "structuredResults": structured,
         "captableVersions": cap_versions,
         "operationLogs": logs,
+        "chatMessages": messages,
         "documentPreviews": build_document_previews(structured),
         "documentComparisons": [],
     }
+
+
+def remove_folder(case_id: str, folder_path: str) -> dict[str, Any]:
+    normalized_folder = normalize_folder_path(folder_path)
+    if not normalized_folder:
+        raise ValueError("Folder path is required")
+
+    with connect() as conn:
+        if normalized_folder == ROOT_FOLDER_NAME:
+            file_rows = conn.execute(
+                """
+                SELECT id, relative_path, source_path
+                FROM files
+                WHERE case_id = ?
+                  AND (relative_path IS NULL OR relative_path = '')
+                """,
+                (case_id,),
+            ).fetchall()
+        else:
+            file_rows = conn.execute(
+                """
+                SELECT id, relative_path, source_path
+                FROM files
+                WHERE case_id = ?
+                  AND relative_path IS NOT NULL
+                  AND relative_path != ''
+                  AND (relative_path = ? OR relative_path LIKE ?)
+                """,
+                (case_id, normalized_folder, f"{normalized_folder}/%"),
+            ).fetchall()
+        if not file_rows:
+            raise KeyError(normalized_folder)
+
+        document_ids = [row["id"] for row in file_rows]
+        document_nodes = conn.execute(
+            """
+            SELECT id FROM topology_nodes
+            WHERE case_id = ? AND entity_type = 'file' AND entity_id IN ({})
+            """.format(",".join("?" for _ in document_ids)),
+            (case_id, *document_ids),
+        ).fetchall()
+        document_node_ids = [row["id"] for row in document_nodes]
+
+        derived_cap_rows = []
+        if document_node_ids:
+            derived_cap_rows = conn.execute(
+                """
+                SELECT id, entity_id
+                FROM topology_nodes
+                WHERE case_id = ?
+                  AND node_type = 'captable_version'
+                  AND parent_id IN ({})
+                """.format(",".join("?" for _ in document_node_ids)),
+                (case_id, *document_node_ids),
+            ).fetchall()
+
+        cap_node_ids = [row["id"] for row in derived_cap_rows]
+        cap_version_ids = [row["entity_id"] for row in derived_cap_rows]
+        now = utc_now()
+        source_paths = {row["source_path"] for row in file_rows if row["source_path"]}
+
+        if cap_version_ids:
+            conn.execute(
+                "DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({})".format(",".join("?" for _ in cap_node_ids)),
+                (case_id, *cap_node_ids),
+            )
+            conn.execute(
+                "DELETE FROM captable_versions WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in cap_version_ids)),
+                (case_id, *cap_version_ids),
+            )
+            conn.execute(
+                "DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({0}) OR to_node_id IN ({0}))".format(
+                    ",".join("?" for _ in cap_node_ids)
+                ),
+                (case_id, *cap_node_ids, *cap_node_ids),
+            )
+            conn.execute(
+                "DELETE FROM topology_nodes WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in cap_node_ids)),
+                (case_id, *cap_node_ids),
+            )
+
+        if document_node_ids:
+            conn.execute(
+                "DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({})".format(",".join("?" for _ in document_node_ids)),
+                (case_id, *document_node_ids),
+            )
+            conn.execute(
+                "DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({0}) OR to_node_id IN ({0}))".format(
+                    ",".join("?" for _ in document_node_ids)
+                ),
+                (case_id, *document_node_ids, *document_node_ids),
+            )
+            conn.execute(
+                "DELETE FROM topology_nodes WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in document_node_ids)),
+                (case_id, *document_node_ids),
+            )
+
+        conn.execute(
+            "DELETE FROM structured_results WHERE case_id = ? AND document_id IN ({})".format(",".join("?" for _ in document_ids)),
+            (case_id, *document_ids),
+        )
+        conn.execute(
+            "DELETE FROM files WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in document_ids)),
+            (case_id, *document_ids),
+        )
+        conn.execute(
+            """
+            INSERT INTO operation_logs (id, case_id, action, node_id, description, created_at)
+            VALUES (?, ?, 'archive', ?, ?, ?)
+            """,
+            (
+                unique_id("log-folder-remove"),
+                case_id,
+                normalized_folder,
+                f"Removed folder {normalized_folder} and its uploaded documents.",
+                now,
+            ),
+        )
+        reset_case_head_pointers(conn, case_id, now)
+        rebuild_case_captable_versions(conn, case_id)
+
+    remove_document_artifacts(source_paths)
+
+    return {
+        "removedFileCount": len(document_ids),
+        "workbench": build_workbench_snapshot(case_id),
+    }
+
+
+def list_case_messages(case_id: str = DEFAULT_CASE_ID) -> list[dict[str, Any]]:
+    create_case(case_id, "Default financing audit")
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM case_messages WHERE case_id = ? ORDER BY created_at, rowid",
+            (case_id,),
+        ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "role": row["role"],
+            "content": row["content"],
+            "createdAt": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def append_case_message(case_id: str, role: str, content: str) -> dict[str, Any]:
+    create_case(case_id, "Default financing audit")
+    message = {
+        "id": unique_id("msg"),
+        "role": role,
+        "content": content,
+        "createdAt": utc_now(),
+    }
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO case_messages (id, case_id, role, content, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (message["id"], case_id, message["role"], message["content"], message["createdAt"]),
+        )
+    return message
 
 
 def get_node_detail(node_id: str) -> dict[str, Any]:
@@ -855,6 +1020,132 @@ def unique_id(prefix: str) -> str:
     return f"{clean}-{uuid4().hex[:8]}"
 
 
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def normalize_relative_path(relative_path: str | None) -> str | None:
+    if not relative_path:
+        return None
+    normalized = relative_path.replace("\\", "/").strip().strip("/")
+    return normalized or None
+
+
+def normalize_folder_path(folder_path: str | None) -> str:
+    if not folder_path:
+        return ""
+    normalized = folder_path.replace("\\", "/").strip().strip("/")
+    return ROOT_FOLDER_NAME if normalized == ROOT_FOLDER_NAME else normalized
+
+
+def folder_path_from_relative_path(relative_path: str | None) -> str | None:
+    normalized = normalize_relative_path(relative_path)
+    if not normalized or "/" not in normalized:
+        return None
+    return normalized.rsplit("/", 1)[0] or None
+
+
+def reset_case_head_pointers(conn: sqlite3.Connection, case_id: str, now: str | None = None) -> None:
+    cap_node = conn.execute(
+        """
+        SELECT id FROM topology_nodes
+        WHERE case_id = ? AND node_type = 'captable_version'
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT 1
+        """,
+        (case_id,),
+    ).fetchone()
+    document_node = conn.execute(
+        """
+        SELECT id FROM topology_nodes
+        WHERE case_id = ? AND entity_type = 'file'
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT 1
+        """,
+        (case_id,),
+    ).fetchone()
+    fallback_id = (cap_node["id"] if cap_node else None) or (document_node["id"] if document_node else None)
+    conn.execute(
+        "UPDATE cases SET current_trunk_node_id = ?, current_viewing_node_id = ?, updated_at = ? WHERE id = ?",
+        (fallback_id, fallback_id, now or utc_now(), case_id),
+    )
+
+
+def rebuild_case_captable_versions(conn: sqlite3.Connection, case_id: str) -> None:
+    cap_rows = conn.execute(
+        """
+        SELECT id, topology_node_id FROM captable_versions
+        WHERE case_id = ?
+        ORDER BY created_at
+        """,
+        (case_id,),
+    ).fetchall()
+    if not cap_rows:
+        return
+
+    current_cap_version_id = cap_rows[-1]["id"]
+    for index, row in enumerate(cap_rows):
+        status = "current" if row["id"] == current_cap_version_id else "historical"
+        document_node = conn.execute(
+            "SELECT parent_id FROM topology_nodes WHERE id = ?",
+            (row["topology_node_id"],),
+        ).fetchone()
+        include_document_id = None
+        if document_node and document_node["parent_id"]:
+            parent = conn.execute(
+                "SELECT entity_id FROM topology_nodes WHERE id = ?",
+                (document_node["parent_id"],),
+            ).fetchone()
+            if parent:
+                include_document_id = parent["entity_id"]
+
+        document_ids = generated_document_ids(conn, case_id, include_document_id)
+        summary = (
+            f"Generated from {len(document_ids)} document(s). Rows are evidence-backed demo calculations."
+            if document_ids
+            else "Generated from 0 document(s). Rows are evidence-backed demo calculations."
+        )
+        conn.execute(
+            """
+            UPDATE captable_versions
+            SET parent_version_id = ?, generated_from_document_ids_json = ?, status = ?, summary = ?
+            WHERE id = ?
+            """,
+            (
+                cap_rows[index - 1]["id"] if index > 0 else None,
+                json.dumps(document_ids, ensure_ascii=False),
+                status,
+                summary,
+                row["id"],
+            ),
+        )
+        conn.execute("DELETE FROM captable_rows WHERE version_id = ?", (row["id"],))
+        write_captable_rows(conn, case_id, row["id"], document_ids)
+
+
+def artifact_stem_for_source_path(source_path: str) -> str:
+    stem = Path(source_path).stem.strip().lower()
+    stem = re.sub(r"[^a-z0-9]+", "_", stem)
+    return stem.strip("_") or "document"
+
+
+def remove_document_artifacts(source_paths: set[str]) -> None:
+    for source_path in source_paths:
+        source = Path(source_path)
+        artifact_stem = artifact_stem_for_source_path(source_path)
+        candidates = DEFAULT_OUTPUT_DIR / "candidates" / f"{artifact_stem}.candidates.json"
+        parsed = DEFAULT_OUTPUT_DIR / "parsed" / f"{artifact_stem}.parsed.json"
+        output_json = DEFAULT_OUTPUT_DIR / f"{artifact_stem}.json"
+        for path in (source, candidates, parsed, output_json):
+            try:
+                if path.exists():
+                    path.unlink()
+            except OSError:
+                continue
+
+
 def parse_number(value: str) -> float:
     match = re.search(r"\d[\d,]*(?:\.\d+)?", value)
     return float(match.group(0).replace(",", "")) if match else 0.0
@@ -962,6 +1253,7 @@ def build_ai_explanation(result: dict[str, Any], file_type: str) -> str:
 
 
 def document_payload(row: sqlite3.Row) -> dict[str, Any]:
+    relative_path = normalize_relative_path(row["relative_path"]) if "relative_path" in row.keys() else None
     return {
         "id": row["id"],
         "fileName": row["file_name"],
@@ -969,11 +1261,26 @@ def document_payload(row: sqlite3.Row) -> dict[str, Any]:
         "transactionDate": row["transaction_date"],
         "uploadedAt": row["uploaded_at"],
         "sourcePath": row["source_path"],
+        "relativePath": relative_path,
+        "folderPath": folder_path_from_relative_path(relative_path),
         "storageProvider": row["storage_provider"],
         "processingStatus": row["processing_status"],
         "evidenceStatus": row["evidence_status"],
         "summary": row["summary"],
     }
+
+
+def get_document_record(case_id: str, document_id: str) -> dict[str, Any]:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM files WHERE id = ? AND case_id = ?",
+            (document_id, case_id),
+        ).fetchone()
+
+    if not row:
+        raise KeyError(document_id)
+
+    return document_payload(row)
 
 
 def structured_payload(row: sqlite3.Row) -> dict[str, Any]:

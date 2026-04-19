@@ -1,0 +1,93 @@
+<h2>中间文档阅读区瘦身对比</h2>
+<p class="subtitle">目标是尽量把空间还给文档正文。下面 3 个方案都保留现有三栏结构，只优化中间阅读区的层级和留白。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:16px;min-height:370px;">
+        <div style="height:22px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="height:8px;width:140px;background:rgba(255,255,255,.24);border-radius:999px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="width:26px;height:26px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+            <div style="height:8px;width:40px;background:rgba(255,255,255,.18);border-radius:999px;"></div>
+            <div style="width:26px;height:26px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+          </div>
+        </div>
+        <div style="height:300px;border:1px solid rgba(255,255,255,.08);border-radius:28px;background:rgba(255,255,255,.02);padding:16px;">
+          <div style="height:100%;border:1px solid rgba(255,180,120,.10);border-radius:22px;background:#111;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <div style="height:8px;width:50px;background:rgba(255,255,255,.16);border-radius:999px;"></div>
+              <div style="height:22px;width:90px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+            </div>
+            <div style="height:220px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:#171717;padding:18px;display:flex;align-items:center;justify-content:center;">
+              <div style="width:76%;height:94%;background:#ddd;box-shadow:0 12px 26px rgba(0,0,0,.28);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 保守压缩</h3>
+      <p>只缩一点 padding 和圆角，保留现在的大部分层级。风险最小，但正文放大量有限。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:12px;min-height:370px;">
+        <div style="height:18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="height:7px;width:150px;background:rgba(255,255,255,.24);border-radius:999px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="width:26px;height:26px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+            <div style="height:8px;width:40px;background:rgba(255,255,255,.18);border-radius:999px;"></div>
+            <div style="width:26px;height:26px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+          </div>
+        </div>
+        <div style="height:312px;border:1px solid rgba(255,255,255,.06);border-radius:18px;background:#101010;padding:10px;position:relative;">
+          <div style="position:absolute;left:14px;top:12px;height:8px;width:46px;background:rgba(255,255,255,.16);border-radius:999px;"></div>
+          <div style="position:absolute;right:14px;top:10px;height:22px;width:88px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+          <div style="height:100%;display:flex;align-items:center;justify-content:center;">
+            <div style="width:82%;height:95%;background:#e3e3e3;box-shadow:0 14px 26px rgba(0,0,0,.24);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 单壳推荐</h3>
+      <p>去掉重复壳层，只保留一层主阅读容器。页码和状态压到边上，正文显示面积明显增加。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:8px;min-height:370px;">
+        <div style="height:14px;display:flex;justify-content:flex-end;align-items:center;margin-bottom:8px;gap:8px;">
+          <div style="width:24px;height:24px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+          <div style="height:8px;width:40px;background:rgba(255,255,255,.18);border-radius:999px;"></div>
+          <div style="width:24px;height:24px;border-radius:999px;border:1px solid rgba(255,255,255,.1);"></div>
+        </div>
+        <div style="height:320px;background:#0f0f0f;padding:4px;position:relative;">
+          <div style="position:absolute;left:10px;top:8px;height:20px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.56);font-size:10px;display:flex;align-items:center;">PAGE 1</div>
+          <div style="position:absolute;right:10px;top:8px;height:20px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.56);font-size:10px;display:flex;align-items:center;">UNVERIFIED</div>
+          <div style="height:100%;display:flex;align-items:center;justify-content:center;">
+            <div style="width:86%;height:97%;background:#ebebeb;box-shadow:0 14px 22px rgba(0,0,0,.22);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 极致沉浸</h3>
+      <p>几乎把所有阅读区装饰都压平，只留极细信息浮层。正文最大，但界面会更“硬”。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我当前推荐</h3>
+  <p>推荐 <strong>B. 单壳推荐</strong>。它能显著增大正文面积，同时还保留阅读器边界、页信息和状态信息，不会过于激进。</p>
+</div>
+
+<div class="section">
+  <h3>请确认</h3>
+  <p>你可以直接回复 <strong>A / B / C</strong>，或者回复“按推荐继续”。我就按这个方向开始压缩中间阅读区。</p>
+</div>

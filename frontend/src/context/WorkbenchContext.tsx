@@ -8,10 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { topologyApi } from "../lib/api/topologyApi";
-import type { TopologyNodeDetail, WorkbenchSnapshot } from "../types/topology";
+import type { ChatMessage, TopologyNodeDetail, WorkbenchSnapshot } from "../types/topology";
 
 interface WorkbenchContextValue {
   snapshot: WorkbenchSnapshot | null;
+  chatMessages: ChatMessage[];
+  chatSending: boolean;
   loading: boolean;
   selectedNodeId: string | null;
   selectedNodeDetail: TopologyNodeDetail | null;
@@ -23,7 +25,9 @@ interface WorkbenchContextValue {
   rejectNode: (nodeId: string) => Promise<void>;
   archiveNode: (nodeId: string) => Promise<void>;
   setViewingVersion: (nodeId: string) => Promise<void>;
-  uploadFiles: (files: File[]) => Promise<Awaited<ReturnType<typeof topologyApi.uploadFiles>>>;
+  uploadFiles: (files: File[], relativePaths?: Array<string | null>) => Promise<Awaited<ReturnType<typeof topologyApi.uploadFiles>>>;
+  removeFolder: (folderPath: string) => Promise<Awaited<ReturnType<typeof topologyApi.removeFolder>>>;
+  sendChatMessage: (message: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -31,18 +35,29 @@ const WorkbenchContext = createContext<WorkbenchContextValue | undefined>(undefi
 
 export function WorkbenchProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatSending, setChatSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<TopologyNodeDetail | null>(null);
 
+  useEffect(() => {
+    setChatMessages(snapshot?.chatMessages ?? []);
+  }, [snapshot]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
-    const next = await topologyApi.getWorkbenchSnapshot();
-    setSnapshot(next);
-    setApiError(topologyApi.getLastError());
-    setLoading(false);
+    try {
+      const next = await topologyApi.getWorkbenchSnapshot();
+      setSnapshot(next);
+      setApiError(topologyApi.getLastError());
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Failed to load workspace");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -58,67 +73,128 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     }
 
     setDetailLoading(true);
+    try {
       const detail = await topologyApi.getNodeDetail(nodeId);
       setSelectedNodeDetail(detail);
       setApiError(topologyApi.getLastError());
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Failed to load node detail");
+      setSelectedNodeDetail(null);
+    } finally {
       setDetailLoading(false);
-    }, []);
+    }
+  }, []);
 
   const syncAfterMutation = useCallback(async (nodeId?: string) => {
-    const next = await topologyApi.getWorkbenchSnapshot();
-    setSnapshot(next);
-    setApiError(topologyApi.getLastError());
-
-    if (nodeId) {
-      const detail = await topologyApi.getNodeDetail(nodeId);
-      setSelectedNodeId(nodeId);
-      setSelectedNodeDetail(detail);
+    try {
+      const next = await topologyApi.getWorkbenchSnapshot();
+      setSnapshot(next);
       setApiError(topologyApi.getLastError());
+      if (nodeId) {
+        const detail = await topologyApi.getNodeDetail(nodeId);
+        setSelectedNodeId(nodeId);
+        setSelectedNodeDetail(detail);
+        setApiError(topologyApi.getLastError());
+      }
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Failed to sync workspace");
     }
   }, []);
 
   const mergeNode = useCallback(
     async (nodeId: string) => {
-      await topologyApi.mergeNode(nodeId);
-      await syncAfterMutation(nodeId);
+      try {
+        await topologyApi.mergeNode(nodeId);
+        await syncAfterMutation(nodeId);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "Failed to merge node");
+      }
     },
     [syncAfterMutation],
   );
 
   const rejectNode = useCallback(
     async (nodeId: string) => {
-      await topologyApi.rejectNode(nodeId);
-      await syncAfterMutation(nodeId);
+      try {
+        await topologyApi.rejectNode(nodeId);
+        await syncAfterMutation(nodeId);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "Failed to reject node");
+      }
     },
     [syncAfterMutation],
   );
 
   const archiveNode = useCallback(
     async (nodeId: string) => {
-      await topologyApi.archiveNode(nodeId);
-      await syncAfterMutation(nodeId);
+      try {
+        await topologyApi.archiveNode(nodeId);
+        await syncAfterMutation(nodeId);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "Failed to archive node");
+      }
     },
     [syncAfterMutation],
   );
 
   const setViewingVersion = useCallback(
     async (nodeId: string) => {
-      await topologyApi.setViewingVersion(nodeId);
-      await syncAfterMutation(selectedNodeId ?? nodeId);
+      try {
+        await topologyApi.setViewingVersion(nodeId);
+        await syncAfterMutation(selectedNodeId ?? nodeId);
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "Failed to switch viewing version");
+      }
     },
     [selectedNodeId, syncAfterMutation],
   );
 
-  const uploadFiles = useCallback(async (files: File[]) => {
-    const result = await topologyApi.uploadFiles(files);
-    setSnapshot(result.workbench);
-    setApiError(topologyApi.getLastError());
-    return result;
+  const uploadFiles = useCallback(async (files: File[], relativePaths: Array<string | null> = []) => {
+    try {
+      const result = await topologyApi.uploadFiles(files, relativePaths);
+      setSnapshot(result.workbench);
+      setApiError(topologyApi.getLastError());
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload files";
+      setApiError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }, []);
+
+  const removeFolder = useCallback(async (folderPath: string) => {
+    try {
+      const result = await topologyApi.removeFolder(folderPath);
+      setSnapshot(result.workbench);
+      setApiError(topologyApi.getLastError());
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to remove folder";
+      setApiError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }, []);
+
+  const sendChatMessage = useCallback(async (message: string) => {
+    setChatSending(true);
+    try {
+      const result = await topologyApi.sendChatMessage(message);
+      setChatMessages(result.messages);
+      setApiError(topologyApi.getLastError());
+    } catch (error) {
+      const failure = error instanceof Error ? error.message : "Failed to send chat message";
+      setApiError(failure);
+      throw error instanceof Error ? error : new Error(failure);
+    } finally {
+      setChatSending(false);
+    }
   }, []);
 
   const value = useMemo<WorkbenchContextValue>(
     () => ({
       snapshot,
+      chatMessages,
+      chatSending,
       loading,
       selectedNodeId,
       selectedNodeDetail,
@@ -131,21 +207,27 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       archiveNode,
       setViewingVersion,
       uploadFiles,
+      removeFolder,
+      sendChatMessage,
       refresh,
     }),
     [
       archiveNode,
       apiError,
+      chatMessages,
+      chatSending,
       detailLoading,
       loading,
       mergeNode,
       refresh,
       rejectNode,
+      sendChatMessage,
       selectNode,
       selectedNodeDetail,
       selectedNodeId,
       setViewingVersion,
       uploadFiles,
+      removeFolder,
       snapshot,
     ],
   );

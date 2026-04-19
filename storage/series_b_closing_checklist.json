@@ -1,0 +1,76 @@
+{
+  "source_file": "Series B Closing Checklist.docx",
+  "document_title": "A – Series A Preferred Closing Checklist",
+  "document_type": "",
+  "parties": [],
+  "dates": [],
+  "financing_terms": {
+    "round": "",
+    "security_classes": [],
+    "purchase_price": [],
+    "share_amounts": [],
+    "valuation_or_cap": [],
+    "closing_terms": [],
+    "milestones": []
+  },
+  "investor_rights": [],
+  "company_obligations": [],
+  "transfer_or_voting_restrictions": [],
+  "key_conditions": [],
+  "risks_or_review_items": [],
+  "raw_candidates": {
+    "dates": [],
+    "money": [],
+    "percentages": [
+      {
+        "value": "2%",
+        "paragraph_id": 2,
+        "source_text": "TABLE 0: [[\"\", \"Clause No.\", \"Description\", \"Deliverables\"], [\"\", \"4.1 Representations and Warranties\", \"The representations and warranties of the Company contained in Section 2 shall be true and correct in all respects as of the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.2 Performance\", \"The Company shall have performed and complied with all covenants, agreements, obligations and conditions contained in this Agreement that are required to be performed or complied with by the Company on or before the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.3 Compliance Certificate\",..."
+      }
+    ],
+    "share_counts": [
+      {
+        "value": "191,005 shares",
+        "paragraph_id": 2,
+        "source_text": "TABLE 0: [[\"\", \"Clause No.\", \"Description\", \"Deliverables\"], [\"\", \"4.1 Representations and Warranties\", \"The representations and warranties of the Company contained in Section 2 shall be true and correct in all respects as of the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.2 Performance\", \"The Company shall have performed and complied with all covenants, agreements, obligations and conditions contained in this Agreement that are required to be performed or complied with by the Company on or before the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.3 Compliance Certificate\",..."
+      },
+      {
+        "value": "653,297 shares",
+        "paragraph_id": 2,
+        "source_text": "TABLE 0: [[\"\", \"Clause No.\", \"Description\", \"Deliverables\"], [\"\", \"4.1 Representations and Warranties\", \"The representations and warranties of the Company contained in Section 2 shall be true and correct in all respects as of the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.2 Performance\", \"The Company shall have performed and complied with all covenants, agreements, obligations and conditions contained in this Agreement that are required to be performed or complied with by the Company on or before the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.3 Compliance Certificate\",..."
+      },
+      {
+        "value": "100,000 shares",
+        "paragraph_id": 2,
+        "source_text": "TABLE 0: [[\"\", \"Clause No.\", \"Description\", \"Deliverables\"], [\"\", \"4.1 Representations and Warranties\", \"The representations and warranties of the Company contained in Section 2 shall be true and correct in all respects as of the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.2 Performance\", \"The Company shall have performed and complied with all covenants, agreements, obligations and conditions contained in this Agreement that are required to be performed or complied with by the Company on or before the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.3 Compliance Certificate\",..."
+      },
+      {
+        "value": "2 Preferred Stock",
+        "paragraph_id": 2,
+        "source_text": "TABLE 0: [[\"\", \"Clause No.\", \"Description\", \"Deliverables\"], [\"\", \"4.1 Representations and Warranties\", \"The representations and warranties of the Company contained in Section 2 shall be true and correct in all respects as of the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.2 Performance\", \"The Company shall have performed and complied with all covenants, agreements, obligations and conditions contained in this Agreement that are required to be performed or complied with by the Company on or before the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.3 Compliance Certificate\",..."
+      },
+      {
+        "value": "5,849,447 Shares",
+        "paragraph_id": 2,
+        "source_text": "TABLE 0: [[\"\", \"Clause No.\", \"Description\", \"Deliverables\"], [\"\", \"4.1 Representations and Warranties\", \"The representations and warranties of the Company contained in Section 2 shall be true and correct in all respects as of the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.2 Performance\", \"The Company shall have performed and complied with all covenants, agreements, obligations and conditions contained in this Agreement that are required to be performed or complied with by the Company on or before the Initial Closing.\", \"Compliance Certificate\"], [\"\", \"4.3 Compliance Certificate\",..."
+      }
+    ],
+    "section_titles": []
+  },
+  "confidence": 0.0,
+  "processing_metadata": {
+    "model": "no-llm",
+    "processed_at": "2026-04-19T23:21:20.226884+00:00",
+    "chunk_count": 1,
+    "status": "candidates_ready",
+    "paragraph_count": 3,
+    "character_count": 6979
+  },
+  "candidate_group_counts": {
+    "metadata": 2,
+    "dates": 3,
+    "financing": 3,
+    "rights": 2,
+    "risks": 2
+  }
+}

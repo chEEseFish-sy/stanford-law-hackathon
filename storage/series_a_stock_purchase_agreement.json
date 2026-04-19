@@ -531,7 +531,7 @@
   "confidence": 0.0,
   "processing_metadata": {
     "model": "no-llm",
-    "processed_at": "2026-04-12T23:48:57.980242+00:00",
+    "processed_at": "2026-04-19T23:21:20.322314+00:00",
     "chunk_count": 7,
     "status": "candidates_ready",
     "paragraph_count": 268,

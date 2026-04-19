@@ -3,14 +3,17 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import sys
+import os
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -22,6 +25,7 @@ try:
         DEFAULT_MODEL,
         DEFAULT_OUTPUT_DIR,
         DEFAULT_TASKS,
+        GeminiExtractor,
         build_index,
         iter_input_files,
         load_dotenv_if_available,
@@ -31,12 +35,16 @@ try:
     )
     from .workbench_store import (
         DEFAULT_CASE_ID,
+        append_case_message,
         build_index_from_db,
+        list_case_messages,
         build_workbench_snapshot,
+        get_document_record,
         get_node_detail,
         ingest_processed_result,
         init_store,
         merge_node,
+        remove_folder,
         set_viewing_version,
         update_node_status,
     )
@@ -46,6 +54,7 @@ except ImportError:
         DEFAULT_MODEL,
         DEFAULT_OUTPUT_DIR,
         DEFAULT_TASKS,
+        GeminiExtractor,
         build_index,
         iter_input_files,
         load_dotenv_if_available,
@@ -55,12 +64,16 @@ except ImportError:
     )
     from workbench_store import (
         DEFAULT_CASE_ID,
+        append_case_message,
         build_index_from_db,
+        list_case_messages,
         build_workbench_snapshot,
+        get_document_record,
         get_node_detail,
         ingest_processed_result,
         init_store,
         merge_node,
+        remove_folder,
         set_viewing_version,
         update_node_status,
     )
@@ -68,6 +81,7 @@ except ImportError:
 ROOT_DIR = SCRIPT_DIR.parent
 DEFAULT_INPUT_DIR = (ROOT_DIR / DEFAULT_INPUT_DIR).resolve() if not DEFAULT_INPUT_DIR.is_absolute() else DEFAULT_INPUT_DIR
 DEFAULT_OUTPUT_DIR = (ROOT_DIR / DEFAULT_OUTPUT_DIR).resolve() if not DEFAULT_OUTPUT_DIR.is_absolute() else DEFAULT_OUTPUT_DIR
+UPLOAD_INPUT_DIR = DEFAULT_OUTPUT_DIR / "uploads"
 
 
 app = FastAPI(title="Document Processing Pipeline")
@@ -89,11 +103,72 @@ app.add_middleware(
 init_store()
 
 
-def pipeline_model_name() -> str:
-    import os
+class ChatRequest(BaseModel):
+    message: str
 
+
+class FolderRemoveRequest(BaseModel):
+    folderPath: str
+
+
+def pipeline_model_name() -> str:
     load_dotenv_if_available()
     return os.getenv("LLM_MODEL_NAME", DEFAULT_MODEL)
+
+
+def llm_api_key() -> str:
+    load_dotenv_if_available()
+    return os.getenv("LLM_API_KEY", "").strip()
+
+
+def build_case_chat_prompt(case_id: str, message: str) -> str:
+    snapshot = build_workbench_snapshot(case_id)
+    recent_messages = list_case_messages(case_id)[-6:]
+    prompt_context = {
+        "workspace": snapshot["workspace"],
+        "documents": [
+            {
+                "fileName": document["fileName"],
+                "fileType": document["fileType"],
+                "transactionDate": document.get("transactionDate"),
+                "evidenceStatus": document["evidenceStatus"],
+                "summary": document["summary"],
+            }
+            for document in snapshot["documents"][-8:]
+        ],
+        "captableVersions": [
+            {
+                "versionName": version["versionName"],
+                "status": version["status"],
+                "summary": version["summary"],
+                "rows": version["rows"][:8],
+            }
+            for version in snapshot["captableVersions"][-3:]
+        ],
+        "operationLogs": snapshot["operationLogs"][:8],
+        "recentMessages": recent_messages,
+    }
+
+    return f"""
+You are VeriCap AI, an internal workspace copilot for financing document review.
+Answer based only on the workspace context below.
+If the context is insufficient, say that clearly and ask the user to upload or open the needed file.
+Be concise, practical, and avoid legal claims of certainty.
+
+Workspace context:
+{json.dumps(prompt_context, ensure_ascii=False, indent=2)}
+
+User message:
+{message.strip()}
+""".strip()
+
+
+def generate_case_chat_reply(case_id: str, message: str) -> str:
+    api_key = llm_api_key()
+    if not api_key:
+        raise RuntimeError("LLM_API_KEY is missing. Add it to the root .env file.")
+    extractor = GeminiExtractor(api_key=api_key, model=pipeline_model_name())
+    return extractor.generate_text(build_case_chat_prompt(case_id, message))
 
 
 def refresh_index() -> dict:
@@ -126,6 +201,24 @@ def list_documents() -> dict:
 @app.get("/api/workbench")
 def get_workbench(case_id: str = DEFAULT_CASE_ID) -> dict:
     return build_workbench_snapshot(case_id)
+
+
+@app.get("/api/cases/{case_id}/documents/{document_id}/download")
+def download_case_document(case_id: str, document_id: str) -> FileResponse:
+    try:
+        document = get_document_record(case_id, document_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} not found") from exc
+
+    source_path = Path(document["sourcePath"])
+    if not source_path.exists() or not source_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Source file for document {document_id} is missing")
+
+    return FileResponse(
+        path=source_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=document["fileName"],
+    )
 
 
 @app.get("/api/cases/{case_id}/topology")
@@ -177,11 +270,48 @@ def switch_viewing_version(case_id: str, node_id: Annotated[str, Form()]) -> dic
 def upload_case_files(
     case_id: str,
     files: Annotated[list[UploadFile], File()],
+    file_paths: Annotated[str | None, Form()] = None,
     use_llm: Annotated[bool, Form()] = False,
     task: Annotated[list[str] | None, Form()] = None,
 ) -> JSONResponse:
-    response = process_uploads(case_id, files, use_llm, task)
-    return JSONResponse(status_code=response["status_code"], content=response["content"])
+    return process_uploads(case_id, files, file_paths, use_llm, task)
+
+
+@app.post("/api/cases/{case_id}/folders/remove")
+def remove_case_folder(case_id: str, payload: FolderRemoveRequest) -> dict:
+    try:
+        result = remove_folder(case_id, payload.folderPath)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Folder {payload.folderPath} not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "removedFolderPath": payload.folderPath,
+        "removedFileCount": result["removedFileCount"],
+        "workbench": result["workbench"],
+    }
+
+
+@app.post("/api/cases/{case_id}/chat")
+def chat_case(case_id: str, payload: ChatRequest) -> dict:
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    try:
+        reply = generate_case_chat_reply(case_id, message)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to generate chat response: {exc}") from exc
+
+    append_case_message(case_id, "user", message)
+    assistant_message = append_case_message(case_id, "assistant", reply)
+    return {
+        "reply": assistant_message,
+        "messages": list_case_messages(case_id),
+    }
 
 
 @app.get("/api/documents-legacy")
@@ -199,20 +329,21 @@ def list_documents_legacy() -> dict:
 @app.post("/api/documents")
 def upload_documents(
     files: Annotated[list[UploadFile], File()],
+    file_paths: Annotated[str | None, Form()] = None,
     use_llm: Annotated[bool, Form()] = False,
     task: Annotated[list[str] | None, Form()] = None,
 ) -> JSONResponse:
-    response = process_uploads(DEFAULT_CASE_ID, files, use_llm, task)
-    return JSONResponse(status_code=response["status_code"], content=response["content"])
+    return process_uploads(DEFAULT_CASE_ID, files, file_paths, use_llm, task)
 
 
 def process_uploads(
     case_id: str,
     files: list[UploadFile],
+    file_paths: str | None,
     use_llm: bool,
     task: list[str] | None,
-) -> dict:
-    DEFAULT_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+) -> JSONResponse:
+    UPLOAD_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     tasks = DEFAULT_TASKS if not task or "all" in task else task
@@ -223,9 +354,11 @@ def process_uploads(
     processed = []
     failures = []
     topology_updates = []
+    relative_paths = parse_file_paths_metadata(file_paths, len(files))
 
-    for upload in files:
+    for index, upload in enumerate(files):
         original_name = Path(upload.filename or "").name
+        relative_path = relative_paths[index] if index < len(relative_paths) else None
         if not original_name:
             failures.append({"source_file": "", "error": "Missing filename"})
             continue
@@ -233,7 +366,7 @@ def process_uploads(
             failures.append({"source_file": original_name, "error": "Only .docx files are supported"})
             continue
 
-        destination = unique_destination(DEFAULT_INPUT_DIR / original_name)
+        destination = stable_upload_destination(original_name)
         try:
             with destination.open("wb") as target:
                 shutil.copyfileobj(upload.file, target)
@@ -257,6 +390,7 @@ def process_uploads(
                     case_id=case_id,
                     result=result,
                     source_path=str(destination),
+                    relative_path=relative_path,
                 )
             )
         except Exception as exc:  # noqa: BLE001 - report per-file failures to the UI.
@@ -267,16 +401,50 @@ def process_uploads(
     index = refresh_index()
     status_code = 207 if failures and processed else 400 if failures else 200
     workbench = build_workbench_snapshot(case_id)
-    return {
-        "status_code": status_code,
-        "content": {
+    return JSONResponse(
+        status_code=status_code,
+        content={
             "processed": processed,
             "failures": failures,
             "index": index,
             "topology_updates": topology_updates,
             "workbench": workbench,
         },
-    }
+    )
+
+
+def parse_file_paths_metadata(file_paths: str | None, file_count: int) -> list[str | None]:
+    if not file_paths:
+        return [None] * file_count
+
+    try:
+        payload = json.loads(file_paths)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid file path metadata") from exc
+
+    if not isinstance(payload, list) or len(payload) != file_count:
+        raise HTTPException(status_code=400, detail="File path metadata does not match uploaded files")
+
+    relative_paths: list[str | None] = []
+    for item in payload:
+        if item is None:
+            relative_paths.append(None)
+            continue
+        if isinstance(item, dict):
+            candidate = item.get("relativePath")
+            relative_paths.append(str(candidate) if candidate else None)
+            continue
+        if isinstance(item, str):
+            relative_paths.append(item)
+            continue
+        raise HTTPException(status_code=400, detail="Unsupported file path metadata entry")
+    return relative_paths
+
+
+def stable_upload_destination(original_name: str) -> Path:
+    destination = UPLOAD_INPUT_DIR / original_name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    return destination
 
 
 def unique_destination(path: Path) -> Path:

@@ -54,14 +54,17 @@ VeriCap 是审计辅助工具，不提供最终法律结论，也不能替代律
 
 ## 环境变量
 
-如果需要启用 LLM 抽取，可在仓库根目录创建 `.env` 文件：
+如果需要启用环境变量配置，可在仓库根目录创建一个统一的 `.env` 文件：
 
 ```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000
 LLM_API_KEY=your_api_key_here
 LLM_MODEL_NAME=gemini-3-flash-preview
 ```
 
-如果没有提供 `LLM_API_KEY`，后端会在上传处理和聊天解释中回退到本地确定性逻辑。
+- 前端会从主目录 `.env` 读取 `VITE_API_BASE_URL`。
+- 后端会从主目录 `.env` 读取 `LLM_API_KEY` 和 `LLM_MODEL_NAME`。
+- 如果没有提供 `LLM_API_KEY`，后端会在上传处理和聊天解释中回退到本地确定性逻辑。
 
 ## 后端启动
 
@@ -107,7 +110,7 @@ Vite 默认通常运行在：
 http://localhost:5173
 ```
 
-前端默认读取 `http://127.0.0.1:8000` 作为后端地址。如果要改成其他地址，请创建 `frontend/.env.local`：
+前端默认读取主目录 `.env` 中的 `VITE_API_BASE_URL` 作为后端地址。如果要改成其他地址，请修改主目录 `.env`：
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8000

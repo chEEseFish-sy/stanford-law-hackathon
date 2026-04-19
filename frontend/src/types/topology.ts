@@ -60,6 +60,8 @@ export interface DocumentMeta {
   transactionDate?: string;
   uploadedAt: string;
   sourcePath: string;
+  relativePath?: string | null;
+  folderPath?: string | null;
   storageProvider: "local" | "private_db" | "object_storage";
   processingStatus: ProcessingStatus;
   evidenceStatus: EvidenceStatus;
@@ -138,6 +140,13 @@ export interface OperationLog {
   createdAt: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
 export interface DocumentPreview {
   documentId: string;
   title: string;
@@ -179,6 +188,7 @@ export interface WorkbenchSnapshot {
   structuredResults: StructuredResult[];
   captableVersions: CapTableVersion[];
   operationLogs: OperationLog[];
+  chatMessages: ChatMessage[];
   documentPreviews: DocumentPreview[];
   documentComparisons: DocumentComparison[];
 }

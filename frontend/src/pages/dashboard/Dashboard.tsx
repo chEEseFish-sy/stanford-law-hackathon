@@ -1,181 +1,287 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Background,
-  Controls,
-  MarkerType,
-  ReactFlow,
-  type Edge,
-  type Node,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import JSZip from "jszip";
 import * as docx from "docx-preview";
 import {
-  ArrowUpRight,
-  GitBranchPlus,
-  History,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderOpen,
+  LoaderCircle,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
   PanelRightOpen,
   Send,
-  Upload,
   Trash2,
+  Upload,
 } from "lucide-react";
+import { topologyApi } from "../../lib/api/topologyApi";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { cn } from "../../utils/cn";
 
 interface UploadedPreviewDocument {
   id: string;
   fileName: string;
-  kind: "text" | "docx" | "pdf" | "image" | "unsupported";
-  content: string;
+  kind: "docx" | "unsupported";
   file?: File;
-  objectUrl?: string;
   uploadedAt: string;
   summary: string;
+  relativePath: string | null;
+  folderPath: string;
 }
 
-function DocxViewer({ file }: { file: File }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [selectionRect, setSelectionRect] = useState<{ top: number; left: number; width: number } | null>(null);
+interface DocumentListItem {
+  id: string;
+  fileName: string;
+  uploadedAt: string;
+  evidenceStatus: "uploaded" | "unverified" | "verified" | "conflict" | "rejected";
+  summary: string;
+  isUpload: boolean;
+  relativePath: string | null;
+  folderPath: string;
+  identityKey: string;
+}
 
-  useEffect(() => {
-    if (!containerRef.current || !file) {
-      return;
-    }
+interface DocumentFolderGroup {
+  folderPath: string;
+  documents: DocumentListItem[];
+}
 
-    const renderDocx = async () => {
-      try {
-        await docx.renderAsync(file, containerRef.current!, undefined, {
-          className: "docx-wrapper",
-          inWrapper: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
-          ignoreFonts: false,
-          breakPages: true,
-          ignoreLastRenderedPageBreak: true,
-          experimental: false,
-          trimXmlDeclaration: true,
-          debug: false,
-        });
-      } catch (error) {
-        console.error("Failed to render DOCX:", error);
-      }
-    };
+type RelativePathFile = File & {
+  webkitRelativePath?: string;
+};
 
-    void renderDocx();
-  }, [file]);
+type UploadStateStatus = "idle" | "uploading" | "success" | "partial_success" | "failed";
 
-  const handleSelection = () => {
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim().length > 0 && containerRef.current?.contains(selection.anchorNode)) {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const containerRect = containerRef.current.getBoundingClientRect();
-      setSelectionRect({
-        top: rect.top - containerRect.top,
-        left: rect.left - containerRect.left,
-        width: rect.width,
-      });
-    } else {
-      setSelectionRect(null);
-    }
-  };
+interface UploadState {
+  status: UploadStateStatus;
+  message: string | null;
+  details: string[];
+}
 
-  const applyHighlight = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) {
-      return;
-    }
+const ROOT_FOLDER_NAME = "Root";
+const LEFT_PANEL_WIDTH = 312;
+const RIGHT_PANEL_WIDTH = 332;
+const COLLAPSED_RAIL_WIDTH = 68;
+const PANEL_TRANSITION = { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const };
+const PAGE_TRANSITION = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
+const EMPTY_UPLOAD_STATE: UploadState = { status: "idle", message: null, details: [] };
 
-    const range = selection.getRangeAt(0);
-    const span = document.createElement("span");
-    span.className = "bg-orange-300/40 border-b-2 border-orange-500 rounded-sm";
+function normalizeRelativePath(relativePath?: string | null) {
+  if (!relativePath) {
+    return null;
+  }
+  const normalized = relativePath.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim();
+  return normalized || null;
+}
 
-    try {
-      range.surroundContents(span);
-      selection.removeAllRanges();
-      setSelectionRect(null);
-    } catch (e) {
-      console.error("Could not highlight across multiple nodes", e);
-      // For complex multi-node selections, a more advanced range-wrapping library would be needed.
-      // But this handles standard text block highlighting out of the box.
-      alert("Please select text within a single paragraph to highlight.");
-    }
-  };
+function resolveFolderPath(relativePath?: string | null) {
+  const normalized = normalizeRelativePath(relativePath);
+  if (!normalized || !normalized.includes("/")) {
+    return ROOT_FOLDER_NAME;
+  }
+  return normalized.split("/").slice(0, -1).join("/") || ROOT_FOLDER_NAME;
+}
 
+function getDocumentIdentity(fileName: string, relativePath?: string | null) {
+  return normalizeRelativePath(relativePath) ?? fileName;
+}
+
+function getDocxPageNodes(container: HTMLElement) {
+  const directPages = Array.from(container.querySelectorAll(".docx-wrapper > section"));
+  if (directPages.length > 0) {
+    return directPages as HTMLElement[];
+  }
+
+  return Array.from(container.querySelectorAll("section")) as HTMLElement[];
+}
+
+function ReaderSurface({
+  children,
+  contentClassName,
+}: {
+  children: React.ReactNode;
+  contentClassName?: string;
+}) {
   return (
-    <div className="relative w-full pb-4">
-      <div
-        ref={containerRef}
-        onMouseUp={handleSelection}
-        className="docx-viewer-container w-full overflow-hidden rounded-[12px] bg-white text-black [&_.docx-wrapper]:!bg-white [&_.docx-wrapper]:!p-4 [&_section]:!shadow-none [&_section]:!bg-white [&_section]:!min-h-0 [&_section]:!h-auto"
-      />
-      
-      <AnimatePresence>
-        {selectionRect ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            style={{
-              position: "absolute",
-              top: Math.max(0, selectionRect.top - 40),
-              left: selectionRect.left + selectionRect.width / 2 - 40,
-            }}
-            className="z-50"
-          >
-            <button
-              onClick={applyHighlight}
-              className="flex items-center gap-1.5 rounded-full border border-orange-300/20 bg-black/80 px-3 py-1.5 text-xs font-medium text-orange-200 shadow-xl backdrop-blur-md transition hover:bg-black hover:text-orange-100"
-            >
-              Highlight
-            </button>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+    <div
+      className={cn(
+        "mx-auto flex h-full w-full max-w-[1140px] min-w-0 flex-col rounded-[18px] border border-white/8 bg-[#101010] px-3 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.22)] md:px-4 md:py-4",
+        contentClassName,
+      )}
+    >
+      {children}
     </div>
   );
 }
 
-export function Dashboard() {
-  const { snapshot, setViewingVersion, uploadFiles } = useWorkbench();
-  const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
-  const comparisons = useMemo(() => snapshot?.documentComparisons ?? [], [snapshot]);
-  const previews = useMemo(() => snapshot?.documentPreviews ?? [], [snapshot]);
-  const topologyNodes = useMemo(() => snapshot?.topology.nodes ?? [], [snapshot]);
-  const topologyRefs = useMemo(() => snapshot?.topology.refs ?? [], [snapshot]);
-  const versionNodes = useMemo(
-    () => topologyNodes.filter((node) => node.nodeType === "captable_version"),
-    [topologyNodes],
-  );
-  const currentVersion = snapshot?.captableVersions.find(
-    (version) => version.topologyNodeId === snapshot.topology.currentViewingNodeId,
-  );
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("");
-  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
-  const [leftPaneWidth, setLeftPaneWidth] = useState(260);
-  const [rightPaneWidth, setRightPaneWidth] = useState(280);
-  const [historyPaneHeight, setHistoryPaneHeight] = useState(220);
-  const [resizeMode, setResizeMode] = useState<"left" | "right" | "history" | null>(null);
-  const [topologyOpen, setTopologyOpen] = useState(false);
-  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
-  const workspaceRef = useRef<HTMLDivElement | null>(null);
-  const rightPaneRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+function DocxPageReader({
+  documentKey,
+  pageIndex,
+  sourceFile,
+  downloadUrl,
+  onPageCountChange,
+  onLoadingChange,
+  onErrorChange,
+}: {
+  documentKey: string;
+  pageIndex: number;
+  sourceFile?: Blob | null;
+  downloadUrl?: string | null;
+  onPageCountChange: (count: number) => void;
+  onLoadingChange: (isLoading: boolean) => void;
+  onErrorChange: (message: string | null) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const documentItems = useMemo(
+  const syncActivePage = useCallback((nextPageIndex: number) => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    const pages = getDocxPageNodes(containerRef.current);
+    pages.forEach((page, index) => {
+      const isActive = index === nextPageIndex;
+      page.style.display = isActive ? "block" : "none";
+      page.setAttribute("aria-hidden", isActive ? "false" : "true");
+    });
+  }, []);
+
+  useEffect(() => {
+    syncActivePage(pageIndex);
+  }, [pageIndex, syncActivePage]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const abortController = new AbortController();
+
+    const renderDocument = async () => {
+      if (!containerRef.current) {
+        return;
+      }
+
+      const container = containerRef.current;
+      container.innerHTML = "";
+      onErrorChange(null);
+      onPageCountChange(0);
+
+      if (!sourceFile && !downloadUrl) {
+        onLoadingChange(false);
+        return;
+      }
+
+      onLoadingChange(true);
+
+      try {
+        let blob: Blob;
+
+        if (sourceFile) {
+          blob = sourceFile;
+        } else {
+          const response = await fetch(downloadUrl!, { signal: abortController.signal });
+          if (!response.ok) {
+            throw new Error(`Failed to download source document (${response.status})`);
+          }
+          blob = await response.blob();
+        }
+
+        if (isCancelled) {
+          return;
+        }
+
+        await docx.renderAsync(await blob.arrayBuffer(), container, undefined, {
+          className: "word-document-shell",
+          inWrapper: true,
+          breakPages: true,
+          ignoreLastRenderedPageBreak: false,
+          useBase64URL: true,
+          experimental: true,
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        const pages = getDocxPageNodes(container);
+        const pageCount = Math.max(pages.length, 1);
+        onPageCountChange(pageCount);
+        syncActivePage(0);
+        onLoadingChange(false);
+      } catch (error) {
+        if (abortController.signal.aborted || isCancelled) {
+          return;
+        }
+
+        console.error(error);
+        container.innerHTML = "";
+        onPageCountChange(0);
+        onLoadingChange(false);
+        onErrorChange(error instanceof Error ? error.message : "Unable to render Word pages.");
+      }
+    };
+
+    void renderDocument();
+
+    return () => {
+      isCancelled = true;
+      abortController.abort();
+    };
+  }, [documentKey, downloadUrl, onErrorChange, onLoadingChange, onPageCountChange, sourceFile, syncActivePage]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="docx-page-reader scrollbar-hidden min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-[14px] bg-transparent px-1 py-1 md:px-2 md:py-2"
+    />
+  );
+}
+
+export function Dashboard() {
+  const { snapshot, chatMessages, chatSending, apiError, sendChatMessage, uploadFiles, removeFolder } =
+    useWorkbench();
+  const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
+
+  const [selectedDocumentId, setSelectedDocumentId] = useState("");
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState(0);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>(EMPTY_UPLOAD_STATE);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [folderPendingRemoval, setFolderPendingRemoval] = useState<DocumentFolderGroup | null>(null);
+  const [isRemovingFolder, setIsRemovingFolder] = useState(false);
+  const [folderRemovalError, setFolderRemovalError] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [wordPageCount, setWordPageCount] = useState(0);
+  const [isWordRendererLoading, setIsWordRendererLoading] = useState(false);
+  const [wordRendererError, setWordRendererError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const serverDocumentKeys = useMemo(
+    () => new Set(documents.map((document) => getDocumentIdentity(document.fileName, document.relativePath))),
+    [documents],
+  );
+
+  const documentItems = useMemo<DocumentListItem[]>(
     () => [
-      ...uploadedDocuments.map((document) => ({
-        id: document.id,
-        fileName: document.fileName,
-        uploadedAt: document.uploadedAt,
-        evidenceStatus: "uploaded" as const,
-        summary: document.summary,
-        isUpload: true,
-      })),
+      ...uploadedDocuments
+        .filter((document) => !serverDocumentKeys.has(getDocumentIdentity(document.fileName, document.relativePath)))
+        .map((document) => ({
+          id: document.id,
+          fileName: document.fileName,
+          uploadedAt: document.uploadedAt,
+          evidenceStatus: "uploaded" as const,
+          summary: document.summary,
+          isUpload: true,
+          relativePath: document.relativePath,
+          folderPath: document.folderPath,
+          identityKey: getDocumentIdentity(document.fileName, document.relativePath),
+        })),
       ...documents.map((document) => ({
         id: document.id,
         fileName: document.fileName,
@@ -183,141 +289,91 @@ export function Dashboard() {
         evidenceStatus: document.evidenceStatus,
         summary: document.summary,
         isUpload: false,
+        relativePath: document.relativePath ?? null,
+        folderPath: document.folderPath ?? resolveFolderPath(document.relativePath),
+        identityKey: getDocumentIdentity(document.fileName, document.relativePath),
       })),
     ],
-    [documents, uploadedDocuments],
+    [documents, serverDocumentKeys, uploadedDocuments],
   );
 
+  const folderGroups = useMemo<DocumentFolderGroup[]>(() => {
+    const grouped = new Map<string, DocumentListItem[]>();
+    documentItems.forEach((document) => {
+      const folderPath = document.folderPath || ROOT_FOLDER_NAME;
+      const bucket = grouped.get(folderPath);
+      if (bucket) {
+        bucket.push(document);
+      } else {
+        grouped.set(folderPath, [document]);
+      }
+    });
+
+    return Array.from(grouped.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([folderPath, groupedDocuments]) => ({
+        folderPath,
+        documents: groupedDocuments.sort((left, right) => left.fileName.localeCompare(right.fileName)),
+      }));
+  }, [documentItems]);
+
   useEffect(() => {
-    if (!selectedDocumentId && documentItems[0]) {
-      setSelectedDocumentId(documentItems[0].id);
+    if (selectedDocumentId && !documentItems.some((item) => item.id === selectedDocumentId)) {
+      setSelectedDocumentId("");
     }
   }, [documentItems, selectedDocumentId]);
 
   useEffect(() => {
-    return () => {
-      uploadedDocuments.forEach((document) => {
-        if (document.objectUrl) {
-          URL.revokeObjectURL(document.objectUrl);
-        }
-      });
-    };
-  }, [uploadedDocuments]);
-
-  useEffect(() => {
-    if (!resizeMode) {
+    if (!folderGroups.length) {
+      setExpandedFolders({});
       return;
     }
+    setExpandedFolders((current) => {
+      const next = { ...current };
+      folderGroups.forEach((group) => {
+        if (!(group.folderPath in next)) {
+          next[group.folderPath] = true;
+        }
+      });
+      Object.keys(next).forEach((folderPath) => {
+        if (!folderGroups.some((group) => group.folderPath === folderPath)) {
+          delete next[folderPath];
+        }
+      });
+      return next;
+    });
+  }, [folderGroups]);
 
-    const handleMove = (event: PointerEvent) => {
-      const workspace = workspaceRef.current?.getBoundingClientRect();
-      const rightPane = rightPaneRef.current?.getBoundingClientRect();
-
-      if (!workspace) {
-        return;
-      }
-
-      if (resizeMode === "left") {
-        const next = Math.min(Math.max(event.clientX - workspace.left, 260), 460);
-        setLeftPaneWidth(next);
-      }
-
-      if (resizeMode === "right") {
-        const next = Math.min(Math.max(workspace.right - event.clientX, 280), 440);
-        setRightPaneWidth(next);
-      }
-
-      if (resizeMode === "history" && rightPane) {
-        const next = Math.min(Math.max(event.clientY - rightPane.top, 160), rightPane.height - 220);
-        setHistoryPaneHeight(next);
-      }
-    };
-
-    const handleUp = () => setResizeMode(null);
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
-    document.body.style.cursor =
-      resizeMode === "history" ? "row-resize" : "col-resize";
-    document.body.style.userSelect = "none";
-
-    return () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [resizeMode]);
-
-  const extractDocxText = useCallback(async (file: File) => {
-    const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const xml = await zip.file("word/document.xml")?.async("string");
-
-    if (!xml) {
-      return "Unable to read the DOCX body.";
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
+  }, [chatMessages, chatSending]);
 
-    const parsed = new DOMParser().parseFromString(xml, "application/xml");
-    const text = Array.from(parsed.getElementsByTagName("w:t"))
-      .map((node) => node.textContent ?? "")
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    return text || "The DOCX file does not contain readable body text.";
-  }, []);
+  useEffect(() => {
+    setActivePageIndex(0);
+    setWordPageCount(0);
+    setWordRendererError(null);
+  }, [selectedDocumentId]);
 
   const buildUploadedPreview = useCallback(
-    async (file: File): Promise<UploadedPreviewDocument> => {
+    async (file: RelativePathFile): Promise<UploadedPreviewDocument> => {
       const lowerName = file.name.toLowerCase();
       const id = `upload-${crypto.randomUUID()}`;
       const uploadedAt = new Date().toISOString().slice(0, 10);
-
-      if (/\.(txt|md|csv|json|ts|tsx|js|jsx|py|sql)$/i.test(lowerName)) {
-        const content = await file.text();
-        return {
-          id,
-          fileName: file.name,
-          kind: "text",
-          content,
-          uploadedAt,
-          summary: "Local text preview loaded.",
-        };
-      }
+      const relativePath = normalizeRelativePath(file.webkitRelativePath);
+      const folderPath = resolveFolderPath(relativePath);
 
       if (/\.docx$/i.test(lowerName)) {
-        const content = await extractDocxText(file);
         return {
           id,
           fileName: file.name,
           kind: "docx",
-          content,
           file,
           uploadedAt,
-          summary: "DOCX document loaded for preview.",
-        };
-      }
-
-      if (/\.pdf$/i.test(lowerName)) {
-        return {
-          id,
-          fileName: file.name,
-          kind: "pdf",
-          content: "",
-          objectUrl: URL.createObjectURL(file),
-          uploadedAt,
-          summary: "PDF preview loaded.",
-        };
-      }
-
-      if (/\.(png|jpg|jpeg|gif|webp)$/i.test(lowerName)) {
-        return {
-          id,
-          fileName: file.name,
-          kind: "image",
-          content: "",
-          objectUrl: URL.createObjectURL(file),
-          uploadedAt,
-          summary: "Image preview loaded.",
+          summary: "DOCX document ready for Word preview.",
+          relativePath,
+          folderPath,
         };
       }
 
@@ -325,157 +381,192 @@ export function Dashboard() {
         id,
         fileName: file.name,
         kind: "unsupported",
-        content: "",
         uploadedAt,
         summary: "Preview is not supported for this file type yet.",
+        relativePath,
+        folderPath,
       };
     },
-    [extractDocxText],
+    [],
   );
 
   const handleFiles = useCallback(
     async (input: FileList | File[]) => {
-      const files = Array.from(input);
+      const files = Array.from(input) as RelativePathFile[];
 
       if (files.length === 0) {
         return;
       }
 
-      setIsUploading(true);
-      setUploadFeedback("Uploading files to VeriCap...");
+      const docxFiles = files.filter((file) => file.name.toLowerCase().endsWith(".docx"));
+      const ignoredCount = files.length - docxFiles.length;
+
+      if (docxFiles.length === 0) {
+        setUploadState({
+          status: "failed",
+          message: "No DOCX files were found in the selected items.",
+          details: [],
+        });
+        setIsDraggingFiles(false);
+        return;
+      }
+
+      setUploadState({
+        status: "uploading",
+        message: ignoredCount > 0 ? "Uploading DOCX files only..." : "Uploading documents...",
+        details: [],
+      });
 
       try {
-        const nextDocuments = await Promise.all(files.map((file) => buildUploadedPreview(file)));
+        const nextDocuments = await Promise.all(docxFiles.map((file) => buildUploadedPreview(file)));
+        const nextDocumentIds = new Set(nextDocuments.map((document) => document.id));
+
         setUploadedDocuments((current) => [...nextDocuments, ...current]);
-        setSelectedDocumentId(nextDocuments[0].id);
+        setSelectedDocumentId((current) => current || nextDocuments[0]?.id || "");
         setIsDraggingFiles(false);
-        
-        await uploadFiles(files);
-        setUploadFeedback(`Successfully uploaded ${files.length} file(s).`);
+
+        const result = await uploadFiles(
+          docxFiles,
+          docxFiles.map((file) => normalizeRelativePath(file.webkitRelativePath)),
+        );
+
+        setUploadedDocuments((current) => current.filter((document) => !nextDocumentIds.has(document.id)));
+        if (result.processed.length > 0) {
+          setSelectedDocumentId(result.topology_updates[0]?.document_id ?? "");
+        } else {
+          setSelectedDocumentId("");
+        }
+
+        if (result.failures.length > 0 && result.processed.length > 0) {
+          setUploadState({
+            status: "partial_success",
+            message: `Uploaded ${result.processed.length} file(s). ${result.failures.length} failed.`,
+            details: result.failures.map((failure) => `${failure.source_file}: ${failure.error}`),
+          });
+        } else if (result.failures.length > 0) {
+          setUploadState({
+            status: "failed",
+            message: "Upload failed for this folder.",
+            details: result.failures.map((failure) => `${failure.source_file}: ${failure.error}`),
+          });
+        } else {
+          setUploadState({
+            status: "success",
+            message: `Successfully uploaded ${result.processed.length} file(s).`,
+            details: [],
+          });
+        }
       } catch (error) {
-        setUploadFeedback("Failed to upload files.");
+        setUploadedDocuments((current) =>
+          current.filter((document) => !docxFiles.some((file) => document.fileName === file.name)),
+        );
+        setSelectedDocumentId("");
+        setUploadState({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Failed to upload files.",
+          details: [],
+        });
         console.error(error);
-      } finally {
-        setIsUploading(false);
-        setTimeout(() => setUploadFeedback(null), 3000);
       }
     },
     [buildUploadedPreview, uploadFiles],
   );
 
-  const handleDeleteFile = useCallback(
-    (id: string, event: React.MouseEvent) => {
-      event.stopPropagation(); // Prevent selecting the file when clicking delete
-      
-      setUploadedDocuments((current) => {
-        const next = current.filter(doc => doc.id !== id);
-        
-        // If we deleted the currently selected file, select the first available one
-        if (selectedDocumentId === id) {
-          if (next.length > 0) {
-            setSelectedDocumentId(next[0].id);
-          } else if (documents.length > 0) {
-            setSelectedDocumentId(documents[0].id);
-          } else {
-            setSelectedDocumentId("");
-          }
-        }
-        
-        return next;
-      });
-    },
-    [selectedDocumentId, documents.length]
-  );
-
-  const activeUploadedDocument =
-    uploadedDocuments.find((document) => document.id === selectedDocumentId) ?? null;
-  const activeDocument = documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null;
-  const activePreview =
-    previews.find((preview) => preview.documentId === activeDocument?.id) ?? previews[0] ?? null;
-  const activeComparison =
-    comparisons.find((comparison) => comparison.currentDocumentId === activeDocument?.id) ??
-    comparisons.find((comparison) => comparison.previousDocumentId === activeDocument?.id) ??
-    comparisons[0] ??
-    null;
-  const activeChange = activeComparison?.changes[0] ?? null;
-  const renderExcerpt = () => {
-    if (!activePreview) {
-      return "Select a document from the right panel.";
+  const handleSendMessage = useCallback(async () => {
+    const message = chatInput.trim();
+    if (!message || chatSending) {
+      return;
     }
 
-    const phrase = activePreview.highlightedPhrases[0];
+    try {
+      await sendChatMessage(message);
+      setChatInput("");
+    } catch (error) {
+      console.error(error);
+    }
+  }, [chatInput, chatSending, sendChatMessage]);
 
-    if (!phrase || !activePreview.excerpt.includes(phrase.text)) {
-      return activePreview.excerpt;
+  const toggleFolder = useCallback((folderPath: string) => {
+    setExpandedFolders((current) => ({
+      ...current,
+      [folderPath]: !current[folderPath],
+    }));
+  }, []);
+
+  const handleConfirmRemoveFolder = useCallback(async () => {
+    if (!folderPendingRemoval) {
+      return;
     }
 
-    const [before, after] = activePreview.excerpt.split(phrase.text);
+    setIsRemovingFolder(true);
+    setFolderRemovalError(null);
 
-    return (
-      <>
-        {before}
-        <span className="rounded-lg bg-orange-400/18 px-1 py-0.5 text-white">
-          {phrase.text}
-        </span>
-        {after}
-      </>
-    );
-  };
+    try {
+      const removedIds = new Set(folderPendingRemoval.documents.map((document) => document.id));
+      await removeFolder(folderPendingRemoval.folderPath);
+      setUploadedDocuments((current) => current.filter((document) => !removedIds.has(document.id)));
 
-  const flowNodes = useMemo<Node[]>(() => {
-    return topologyNodes.map((node) => ({
-      id: node.id,
-      position: {
-        x: node.depth * 220 + 40,
-        y: node.index * 120 + 40,
-      },
-      data: { label: node.label },
-      style: {
-        borderRadius: 18,
-        padding: 12,
-        width: 180,
-        border:
-          snapshot?.topology.currentViewingNodeId === node.id
-            ? "1px solid rgba(255,181,120,0.7)"
-            : "1px solid rgba(255,255,255,0.12)",
-        background:
-          snapshot?.topology.currentViewingNodeId === node.id
-            ? "rgba(255,132,33,0.16)"
-            : "rgba(255,255,255,0.06)",
-        color: "#ffffff",
-        fontSize: 12,
-      },
-    }));
-  }, [snapshot?.topology.currentViewingNodeId, topologyNodes]);
+      if (removedIds.has(selectedDocumentId)) {
+        setSelectedDocumentId("");
+      }
 
-  const flowEdges = useMemo<Edge[]>(() => {
-    const parentEdges = topologyNodes
-      .filter((node) => node.parentId)
-      .map((node) => ({
-        id: `${node.parentId}-${node.id}`,
-        source: node.parentId!,
-        target: node.id,
-        type: "smoothstep" as const,
-        markerEnd: { type: MarkerType.ArrowClosed, color: "#f3a15d" },
-        style: { stroke: "#f3a15d", strokeWidth: 1.6, opacity: 0.85 },
-      }));
+      setFolderPendingRemoval(null);
+    } catch (error) {
+      setFolderRemovalError(error instanceof Error ? error.message : "Failed to remove folder.");
+    } finally {
+      setIsRemovingFolder(false);
+    }
+  }, [folderPendingRemoval, removeFolder, selectedDocumentId]);
 
-    const refEdges = topologyRefs.map((ref) => ({
-      id: `${ref.fromNodeId}-${ref.toNodeId}-${ref.refType}`,
-      source: ref.fromNodeId,
-      target: ref.toNodeId,
-      type: "straight" as const,
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#8f8f8f" },
-      style: {
-        stroke: ref.refType === "conflicts_with" ? "#ffb15b" : "#8f8f8f",
-        strokeWidth: 1.2,
-        strokeDasharray: ref.refType === "conflicts_with" ? "6 6" : "4 8",
-        opacity: 0.65,
-      },
-    }));
+  const activeDocumentItem = documentItems.find((document) => document.id === selectedDocumentId) ?? null;
+  const activeUploadedDocument = uploadedDocuments.find((document) => document.id === selectedDocumentId) ?? null;
+  const activeServerDocument = documents.find((document) => document.id === selectedDocumentId) ?? null;
 
-    return [...parentEdges, ...refEdges];
-  }, [topologyNodes, topologyRefs]);
+  const activeDocumentIsDocx = useMemo(() => {
+    const fileName = activeUploadedDocument?.fileName ?? activeServerDocument?.fileName ?? activeDocumentItem?.fileName ?? "";
+    return fileName.toLowerCase().endsWith(".docx");
+  }, [activeDocumentItem?.fileName, activeServerDocument?.fileName, activeUploadedDocument?.fileName]);
+
+  const activeDocumentDownloadUrl = useMemo(() => {
+    if (!activeServerDocument?.id) {
+      return null;
+    }
+    return topologyApi.getDocumentDownloadUrl(activeServerDocument.id);
+  }, [activeServerDocument?.id]);
+
+  const totalPages = activeDocumentIsDocx ? wordPageCount : 0;
+
+  useEffect(() => {
+    if (totalPages === 0 && activePageIndex !== 0) {
+      setActivePageIndex(0);
+      return;
+    }
+
+    if (activePageIndex >= totalPages && totalPages > 0) {
+      setActivePageIndex(totalPages - 1);
+    }
+  }, [activePageIndex, totalPages]);
+
+  const canGoToPreviousPage = activePageIndex > 0;
+  const canGoToNextPage = activePageIndex < totalPages - 1;
+  const isReaderError =
+    !!selectedDocumentId &&
+    (activeServerDocument?.processingStatus === "error" ||
+      (!!wordRendererError && uploadState.status !== "uploading"));
+
+  const goToPreviousPage = useCallback(() => {
+    if (!canGoToPreviousPage) {
+      return;
+    }
+    setActivePageIndex((current) => current - 1);
+  }, [canGoToPreviousPage]);
+
+  const goToNextPage = useCallback(() => {
+    if (!canGoToNextPage) {
+      return;
+    }
+    setActivePageIndex((current) => current + 1);
+  }, [canGoToNextPage]);
 
   return (
     <motion.div
@@ -484,74 +575,130 @@ export function Dashboard() {
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className="h-full w-full"
     >
-      <div
-        ref={workspaceRef}
-        className="flex h-full w-full overflow-hidden bg-[#0A0A0A]"
-      >
-        <section
-          className="flex h-full min-w-0 flex-col border-r border-white/10 bg-white/[0.04]"
-          style={{ width: leftPaneWidth }}
+      <div className="flex h-full w-full overflow-hidden bg-[#0A0A0A]">
+        <motion.aside
+          animate={{ width: isLeftPanelCollapsed ? COLLAPSED_RAIL_WIDTH : LEFT_PANEL_WIDTH }}
+          transition={PANEL_TRANSITION}
+          className="h-full shrink-0 overflow-hidden border-r border-white/10 bg-white/[0.04]"
         >
-          <div className="border-b border-white/10 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-orange-500/12 p-3 text-orange-100">
-                <MessageSquare className="h-5 w-5" />
+          {isLeftPanelCollapsed ? (
+            <button
+              onClick={() => setIsLeftPanelCollapsed(false)}
+              className="group flex h-full w-full flex-col items-center justify-center gap-4 bg-transparent px-2 text-white/68 transition hover:bg-white/[0.03]"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-orange-200 transition group-hover:border-orange-300/30 group-hover:bg-orange-500/10">
+                <PanelLeftOpen className="h-4 w-4" />
+              </span>
+              <span className="[writing-mode:vertical-rl] text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50 [text-orientation:mixed]">
+                AI Chat
+              </span>
+            </button>
+          ) : (
+            <div className="flex h-full min-w-0 flex-col">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl bg-orange-500/12 p-3 text-orange-100">
+                    <MessageSquare className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/38">Assistant</div>
+                    <div className="mt-1 text-sm font-semibold text-white">AI Chat</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsLeftPanelCollapsed(true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/65 transition hover:border-orange-300/24 hover:bg-orange-500/10 hover:text-orange-100 active:scale-[0.97]"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
               </div>
-              <div className="text-sm font-semibold text-white">AI chat</div>
-            </div>
-          </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
-            <div className="flex flex-col items-start gap-1">
-              <div className="rounded-[18px] rounded-tl-sm border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white/80 max-w-[95%]">
-                Hello! I'm VeriCap AI. I've loaded the workspace. What would you like to verify today?
+              <div ref={chatScrollRef} className="scrollbar-hidden flex-1 min-h-0 space-y-4 overflow-y-auto px-4 py-4">
+                {chatMessages.length === 0 ? (
+                  <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-4 text-sm leading-6 text-white/48">
+                    暂无对话。选中文档后，你可以在这里询问条款、证据冲突或关键信息。
+                  </div>
+                ) : null}
+
+                {chatMessages.map((message) => {
+                  const isUser = message.role === "user";
+                  const timestamp = new Date(message.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+
+                  return (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[92%] rounded-[18px] px-4 py-3 text-sm leading-6",
+                          isUser
+                            ? "rounded-tr-sm border border-orange-500/20 bg-orange-500/10 text-orange-50"
+                            : "rounded-tl-sm border border-white/10 bg-white/[0.03] text-white/80",
+                        )}
+                      >
+                        {message.content}
+                      </div>
+                      <div className={cn("text-[10px] text-white/28", isUser ? "mr-1" : "ml-1")}>{timestamp}</div>
+                    </motion.div>
+                  );
+                })}
+
+                {chatSending ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-start gap-1"
+                  >
+                    <div className="rounded-[18px] rounded-tl-sm border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
+                      Thinking...
+                    </div>
+                  </motion.div>
+                ) : null}
               </div>
-              <div className="text-[10px] text-white/30 ml-1">10:00 AM</div>
-            </div>
-            
-            <div className="flex flex-col items-end gap-1">
-              <div className="rounded-[18px] rounded-tr-sm border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm leading-6 text-orange-50 max-w-[95%]">
-                Can you check if the Cap Table matches the latest SAFE documents?
+
+              <div className="border-t border-white/10 p-3">
+                <div className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <input
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void handleSendMessage();
+                      }
+                    }}
+                    className="flex-1 bg-transparent text-sm text-white/82 outline-none placeholder:text-white/34"
+                    placeholder={selectedDocumentId ? "Ask about the active document..." : "Select a document, then ask a question..."}
+                  />
+                  <button
+                    onClick={() => void handleSendMessage()}
+                    disabled={!chatInput.trim() || chatSending}
+                    className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-full transition",
+                      !chatInput.trim() || chatSending
+                        ? "bg-orange-500/8 text-orange-100/35"
+                        : "bg-orange-500/14 text-orange-100 hover:bg-orange-500/20 active:scale-[0.97]",
+                    )}
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </div>
+                {apiError ? <div className="mt-2 text-xs text-rose-300/80">{apiError}</div> : null}
               </div>
-              <div className="text-[10px] text-white/30 mr-1">10:01 AM</div>
             </div>
-
-            <div className="flex flex-col items-start gap-1">
-              <div className="rounded-[18px] rounded-tl-sm border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white/80 max-w-[95%]">
-                I found a discrepancy. The Series Seed round in the Cap Table shows $2M raised, but the SAFE documents aggregate to $2.5M. I've highlighted the conflict in the document viewer.
-              </div>
-              <div className="text-[10px] text-white/30 ml-1">10:01 AM</div>
-            </div>
-          </div>
-
-          <div className="border-t border-white/10 p-3">
-            <div className="flex items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-2.5">
-              <input
-                value=""
-                readOnly
-                className="flex-1 bg-transparent text-sm text-white/35 outline-none"
-                placeholder="Ask about the active document..."
-              />
-              <button className="rounded-full bg-orange-500/14 p-2.5 text-orange-100 transition hover:bg-orange-500/20 active:scale-95">
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <div
-          onPointerDown={(event) => {
-            event.preventDefault();
-            setResizeMode("left");
-          }}
-          className="group relative w-4 shrink-0 cursor-col-resize bg-transparent touch-none"
-        >
-          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10 transition group-hover:bg-orange-300/50" />
-          <span className="absolute left-1/2 top-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 transition group-hover:bg-orange-300/60" />
-        </div>
+          )}
+        </motion.aside>
 
         <section
-          className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white/[0.03]"
+          className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.015),rgba(255,255,255,0.008))]"
           onDragOver={(event) => {
             event.preventDefault();
             setIsDraggingFiles(true);
@@ -569,351 +716,462 @@ export function Dashboard() {
           }}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.24em] text-orange-200/70">
-                {activeUploadedDocument?.fileName ?? activeDocument?.fileName ?? "Document"}
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-orange-200/70">Document Reader</div>
+              <div className="mt-1 truncate text-sm font-semibold text-white">
+                {activeDocumentItem?.fileName ?? "No document selected"}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {uploadFeedback ? (
-                <span className="text-xs text-white/45">{uploadFeedback}</span>
-              ) : null}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                accept=".txt,.md,.csv,.json,.docx,.pdf,.png,.jpg,.jpeg,.gif,.webp"
-                onChange={(event) => {
-                  if (event.target.files) {
-                    void handleFiles(event.target.files);
-                  }
-                  event.currentTarget.value = "";
-                }}
-              />
+
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
+                onClick={goToPreviousPage}
+                disabled={!canGoToPreviousPage}
                 className={cn(
-                  "flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
-                  isUploading
-                    ? "border-white/5 bg-white/[0.02] text-white/30 cursor-not-allowed"
-                    : "border-white/10 bg-white/[0.05] text-white hover:bg-white/[0.08] active:scale-95"
+                  "flex h-10 w-10 items-center justify-center rounded-full border transition",
+                  canGoToPreviousPage
+                    ? "border-white/10 bg-white/[0.04] text-white hover:border-orange-300/24 hover:bg-orange-500/10 active:scale-[0.97]"
+                    : "border-white/6 bg-white/[0.02] text-white/25",
                 )}
               >
-                <Upload className={cn("h-4 w-4", isUploading ? "text-white/20" : "text-orange-200")} />
-                {isUploading ? "Uploading..." : "Upload"}
+                <ChevronLeft className="h-4 w-4" />
               </button>
+              <div className="min-w-[76px] text-center text-xs font-medium text-white/52">
+                {selectedDocumentId ? `${Math.min(activePageIndex + 1, Math.max(totalPages, 1))} / ${Math.max(totalPages, 1)}` : "0 / 0"}
+              </div>
               <button
-                onClick={() => setTopologyOpen(true)}
-                className="flex items-center gap-2 rounded-full border border-orange-300/18 bg-orange-500/10 px-4 py-2 text-sm text-white transition hover:bg-orange-500/16 active:scale-95"
+                onClick={goToNextPage}
+                disabled={!canGoToNextPage}
+                className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-full border transition",
+                  canGoToNextPage
+                    ? "border-white/10 bg-white/[0.04] text-white hover:border-orange-300/24 hover:bg-orange-500/10 active:scale-[0.97]"
+                    : "border-white/6 bg-white/[0.02] text-white/25",
+                )}
               >
-                <PanelRightOpen className="h-4 w-4 text-orange-200" />
-                Topology
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden flex flex-col relative">
-            {activeUploadedDocument ? (
-              <div className="absolute inset-0 p-3 flex flex-col">
-                <div className="flex-1 min-h-0 rounded-[18px] border border-white/10 bg-black/18 p-3 flex flex-col">
-                  <div className="flex-1 min-h-0 rounded-[16px] border border-orange-300/14 bg-orange-500/10 flex flex-col overflow-hidden p-4">
-                    <div className="flex-1 min-h-0 overflow-y-auto rounded-[12px] bg-white">
-                      {activeUploadedDocument.kind === "pdf" && activeUploadedDocument.objectUrl ? (
-                      <iframe
-                        title={activeUploadedDocument.fileName}
-                        src={activeUploadedDocument.objectUrl}
-                        className="h-[900px] w-full rounded-[12px] bg-white"
-                      />
-                    ) : null}
-                    {activeUploadedDocument.kind === "image" && activeUploadedDocument.objectUrl ? (
-                      <img
-                        src={activeUploadedDocument.objectUrl}
-                        alt={activeUploadedDocument.fileName}
-                        className="max-h-none w-full rounded-[12px] object-contain"
-                      />
-                    ) : null}
-                    {activeUploadedDocument.kind === "docx" && activeUploadedDocument.file ? (
-                      <DocxViewer file={activeUploadedDocument.file} />
-                    ) : null}
-                    {activeUploadedDocument.kind === "text" ? (
-                      <pre className="min-h-[900px] whitespace-pre-wrap break-words font-sans text-sm leading-7 text-white/84">
-                        {activeUploadedDocument.content}
-                      </pre>
-                    ) : null}
-                    {activeUploadedDocument.kind === "unsupported" ? (
-                      <div className="flex min-h-[320px] items-center justify-center text-sm text-white/58">
-                        Preview is not available for this file type yet.
-                      </div>
-                    ) : null}
+          <div className="relative flex-1 min-h-0 overflow-hidden px-3 py-3">
+            {!selectedDocumentId ? (
+              <ReaderSurface>
+                <div className="flex flex-1 items-center justify-center">
+                  <div className="max-w-[380px] text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-orange-300/18 bg-orange-500/10 text-orange-200">
+                      <FileText className="h-7 w-7" />
                     </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col min-h-full">
-                <div className="grid min-h-0 h-[480px] shrink-0 grid-cols-2 border-b border-white/10">
-                  <div className="flex flex-col min-h-0 border-r border-white/10 p-4">
-                    <div className="mb-3 flex shrink-0 items-center justify-between">
-                      <div className="text-sm font-semibold text-white">Previous</div>
-                      <span className="text-xs text-white/35">
-                        {activeComparison?.changes[0]?.sourceLabel ?? activePreview?.highlightedPhrases[0]?.sourceLabel}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto rounded-[18px] border border-white/8 bg-black/18 p-5 text-[14.5px] leading-7 text-white/60">
-                      {activeChange?.previousText ?? activePreview?.excerpt ?? "No previous text loaded."}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col min-h-0 p-4">
-                    <div className="mb-3 flex shrink-0 items-center justify-between">
-                      <div className="text-sm font-semibold text-white">Current</div>
-                      <span
-                        className={cn(
-                          "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
-                          activeComparison?.assessment === "good"
-                            ? "bg-emerald-500/12 text-emerald-100"
-                            : activeComparison?.assessment === "bad"
-                              ? "bg-rose-500/12 text-rose-100"
-                              : "bg-amber-500/12 text-amber-100",
-                        )}
+                    <h2 className="mt-6 text-2xl font-semibold text-white">开始阅读一份文档</h2>
+                    <p className="mt-4 text-sm leading-7 text-white/58">
+                      从右侧 `Files` 选择一份文档，或先上传新的 DOCX 文档。进入后使用左右按钮切换分页。
+                    </p>
+                    <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        onClick={() => {
+                          setIsRightPanelCollapsed(false);
+                        }}
+                        className="rounded-full bg-orange-500/14 px-5 py-3 text-sm font-medium text-orange-100 transition hover:bg-orange-500/20 active:scale-[0.98]"
                       >
-                        {activeComparison?.assessment?.replace(/_/g, " ") ?? "live"}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto rounded-[18px] border border-orange-300/14 bg-orange-500/10 p-5 text-[14.5px] leading-7 text-white/84">
-                      {activeChange?.currentText ?? renderExcerpt()}
+                        选择文件
+                      </button>
+                      <button
+                        onClick={() => folderInputRef.current?.click()}
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/78 transition hover:bg-white/[0.08] active:scale-[0.98]"
+                      >
+                        上传文档
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                <div className="grid flex-1 grid-cols-[0.9fr,1.1fr]">
-                  <div className="flex flex-col justify-center border-r border-white/10 p-6">
-                    <div className="text-[14.5px] leading-relaxed text-white/70">
-                      {activeComparison?.summary ?? activeDocument?.summary ?? "No summary loaded."}
+              </ReaderSurface>
+            ) : activeDocumentIsDocx ? (
+              <ReaderSurface contentClassName="overflow-hidden">
+                <div className="relative flex h-full min-h-0 flex-col">
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/28">
+                      Page {Math.min(activePageIndex + 1, Math.max(totalPages, 1))}
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {(activePreview?.highlightedPhrases ?? []).map((phrase) => (
-                        <span
-                          key={`${phrase.sourceLabel}-${phrase.text}`}
-                          className={cn(
-                            "rounded-full border px-3 py-1.5 text-xs font-medium",
-                            phrase.tone === "good"
-                              ? "border-emerald-300/22 bg-emerald-500/10 text-emerald-100"
-                              : phrase.tone === "bad"
-                                ? "border-amber-300/22 bg-amber-500/10 text-amber-100"
-                                : "border-white/10 bg-white/[0.05] text-white/68",
-                          )}
-                        >
-                          {phrase.sourceLabel}
-                        </span>
-                      ))}
+                    <div className="rounded-full border border-white/8 bg-white/[0.02] px-2.5 py-1 text-[9px] uppercase tracking-[0.18em] text-white/38">
+                      {activeDocumentItem?.evidenceStatus ?? "ready"}
                     </div>
                   </div>
 
-                  <div className="flex flex-col justify-center p-6">
-                    <div className="mb-4 flex shrink-0 items-center justify-between">
-                      <div className="text-sm font-semibold text-white">Cap table</div>
-                      <span className="text-xs text-white/35">{currentVersion?.versionName}</span>
-                    </div>
-                    <div className="grid gap-2">
-                      {(currentVersion?.rows ?? []).slice(0, 4).map((row) => (
-                        <div
-                          key={`${row.holderName}-${row.securityType}`}
-                          className="flex items-center justify-between rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3"
-                        >
-                          <div>
-                            <div className="text-sm font-medium text-white">{row.holderName}</div>
-                            <div className="mt-0.5 text-[11px] text-white/42">{row.sourceLocation}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-white">{row.shares.toLocaleString()}</div>
-                            <div className="mt-0.5 text-[11px] text-white/42">{row.securityType}</div>
+                  <motion.div
+                    animate={{ x: 0 }}
+                    transition={PAGE_TRANSITION}
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
+                    <DocxPageReader
+                      documentKey={selectedDocumentId}
+                      pageIndex={activePageIndex}
+                      sourceFile={activeUploadedDocument?.file}
+                      downloadUrl={activeUploadedDocument?.file ? null : activeDocumentDownloadUrl}
+                      onPageCountChange={setWordPageCount}
+                      onLoadingChange={setIsWordRendererLoading}
+                      onErrorChange={setWordRendererError}
+                    />
+                  </motion.div>
+
+                  <AnimatePresence>
+                    {isWordRendererLoading ? (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-10 flex items-center justify-center rounded-[22px] bg-black/58 backdrop-blur-sm"
+                      >
+                        <div className="text-center">
+                          <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-orange-200" />
+                          <div className="mt-4 text-base font-medium text-white">Preparing Word pages...</div>
+                          <div className="mt-2 text-sm text-white/50">
+                            The reader shell stays fixed while the DOCX layout is rendered.
                           </div>
                         </div>
-                      ))}
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {isReaderError ? (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-20 flex items-center justify-center rounded-[22px] bg-black/78 px-6 backdrop-blur-sm"
+                      >
+                        <div className="max-w-[420px] text-center">
+                          <div className="text-lg font-semibold text-white">Unable to render this document</div>
+                          <div className="mt-3 text-sm leading-7 text-white/56">
+                            {wordRendererError ??
+                              "The document is currently unavailable. Select another file from `Files` or re-upload the source document."}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              </ReaderSurface>
+            ) : (
+              <ReaderSurface>
+                <div className="flex flex-1 items-center justify-center">
+                  <div className="max-w-[420px] text-center">
+                    <div className="text-lg font-semibold text-white">Word rendering is only available for DOCX</div>
+                    <div className="mt-3 text-sm leading-7 text-white/56">
+                      Select a DOCX document to open the strict Word-style reader. Other file types are not part of this rendering path.
                     </div>
                   </div>
                 </div>
-              </div>
+              </ReaderSurface>
             )}
+
             {isDraggingFiles ? (
               <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/72 backdrop-blur-sm">
-                <div className="rounded-[24px] border border-orange-300/24 bg-orange-500/10 px-8 py-6 text-center">
-                  <Upload className="mx-auto h-7 w-7 text-orange-200" />
-                  <div className="mt-3 text-base font-semibold text-white">Drop files</div>
+                <div className="rounded-[28px] border border-orange-300/24 bg-orange-500/10 px-10 py-8 text-center shadow-2xl">
+                  <Upload className="mx-auto h-8 w-8 text-orange-200" />
+                  <div className="mt-4 text-lg font-semibold text-white">Drop DOCX files to upload</div>
+                  <div className="mt-2 text-sm text-white/55">They will appear in the Files panel and open in the reader.</div>
                 </div>
               </div>
             ) : null}
           </div>
-
-          <AnimatePresence>
-            {topologyOpen ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute inset-0 z-20 bg-black/80 backdrop-blur-xl"
-              >
-                <div className="flex h-full flex-col">
-                  <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-                    <div className="flex items-center gap-2 text-white">
-                      <History className="h-4 w-4 text-orange-200" />
-                      Full topology
-                    </div>
-                    <button
-                      onClick={() => setTopologyOpen(false)}
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/70 transition hover:bg-white/[0.08]"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <div className="flex-1">
-                    <ReactFlow
-                      nodes={flowNodes}
-                      edges={flowEdges}
-                      fitView
-                      fitViewOptions={{ padding: 0.18 }}
-                      className="bg-[radial-gradient(circle_at_top_left,_rgba(255,123,0,0.08),_transparent_20%),linear-gradient(180deg,_#090909_0%,_#111111_100%)]"
-                    >
-                      <Background color="rgba(255,255,255,0.08)" gap={18} />
-                      <Controls className="border border-white/10 bg-black/60 text-white" />
-                    </ReactFlow>
-                  </div>
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
         </section>
 
-        <div
-          onPointerDown={(event) => {
-            event.preventDefault();
-            setResizeMode("right");
-          }}
-          className="group relative w-4 shrink-0 cursor-col-resize bg-transparent touch-none"
+        <motion.aside
+          animate={{ width: isRightPanelCollapsed ? COLLAPSED_RAIL_WIDTH : RIGHT_PANEL_WIDTH }}
+          transition={PANEL_TRANSITION}
+          className="h-full shrink-0 overflow-hidden border-l border-white/10 bg-white/[0.04]"
         >
-          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/10 transition group-hover:bg-orange-300/50" />
-          <span className="absolute left-1/2 top-1/2 h-12 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 transition group-hover:bg-orange-300/60" />
-        </div>
-
-        <aside
-          ref={rightPaneRef}
-          className="flex h-full min-w-0 flex-col bg-white/[0.04]"
-          style={{ width: rightPaneWidth }}
-        >
-          <div
-            className="flex flex-col min-h-0 overflow-hidden border-b border-white/10"
-            style={{ height: historyPaneHeight }}
-          >
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <History className="h-4 w-4 text-orange-200" />
-                History
-              </div>
-              <button
-                onClick={() => setTopologyOpen(true)}
-                className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/48"
-              >
-                Expand
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 pb-3">
-              {versionNodes.map((node) => (
-                <button
-                  key={node.id}
-                  onClick={() => void setViewingVersion(node.id)}
-                  className={cn(
-                    "w-full rounded-[16px] border px-3 py-2.5 text-left transition duration-200",
-                    snapshot?.topology.currentViewingNodeId === node.id
-                      ? "border-orange-300/32 bg-orange-500/12"
-                      : "border-white/8 bg-black/18 hover:bg-white/[0.05]",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-white">{node.label}</div>
-                      <div className="mt-1 text-xs text-white/40">{node.status}</div>
-                    </div>
-                    <ArrowUpRight className="h-4 w-4 text-white/35" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div
-            onPointerDown={(event) => {
-              event.preventDefault();
-              setResizeMode("history");
-            }}
-            className="group relative h-4 shrink-0 cursor-row-resize bg-transparent touch-none"
-          >
-            <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10 transition group-hover:bg-orange-300/50" />
-            <span className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10 transition group-hover:bg-orange-300/60" />
-          </div>
-
-          <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <GitBranchPlus className="h-4 w-4 text-orange-200" />
-                Files
-              </div>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/48">
-                {documentItems.length}
+          {isRightPanelCollapsed ? (
+            <button
+              onClick={() => setIsRightPanelCollapsed(false)}
+              className="group flex h-full w-full flex-col items-center justify-center gap-4 bg-transparent px-2 text-white/68 transition hover:bg-white/[0.03]"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-orange-200 transition group-hover:border-orange-300/30 group-hover:bg-orange-500/10">
+                <PanelRightOpen className="h-4 w-4" />
               </span>
-            </div>
-            <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 pb-3">
-              {documentItems.map((document) => (
-                <div
-                  key={document.id}
-                  className={cn(
-                    "group relative w-full rounded-[16px] border transition duration-200",
-                    selectedDocumentId === document.id
-                      ? "border-orange-300/32 bg-orange-500/12"
-                      : "border-white/8 bg-black/18 hover:bg-white/[0.05]",
-                  )}
-                >
+              <span className="[writing-mode:vertical-rl] text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50 [text-orientation:mixed]">
+                Files
+              </span>
+            </button>
+          ) : (
+            <div className="flex h-full min-w-0 flex-col">
+              <div className="border-b border-white/10 px-4 py-3.5">
+                <div className="flex items-center justify-between">
                   <button
-                    onClick={() => setSelectedDocumentId(document.id)}
-                    className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left"
+                    onClick={() => setIsRightPanelCollapsed(true)}
+                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/65 transition hover:border-orange-300/24 hover:bg-orange-500/10 hover:text-orange-100 active:scale-[0.97]"
                   >
-                    <div className="min-w-0 pr-6">
-                      <div className="truncate text-sm font-semibold text-white">{document.fileName}</div>
-                      <div className="mt-1 text-xs text-white/40">{document.uploadedAt}</div>
+                    <PanelRightClose className="h-4 w-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-white/38">Workspace</div>
+                      <div className="mt-1 text-sm font-semibold text-white">Files</div>
                     </div>
-                    <span
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] shrink-0",
-                        document.evidenceStatus === "verified"
-                          ? "bg-emerald-500/12 text-emerald-100"
-                          : document.evidenceStatus === "conflict"
-                            ? "bg-amber-500/12 text-amber-100"
-                            : document.evidenceStatus === "uploaded"
-                              ? "bg-sky-500/12 text-sky-100"
-                            : document.evidenceStatus === "rejected"
-                              ? "bg-rose-500/12 text-rose-100"
-                              : "bg-white/[0.08] text-white/55",
-                      )}
-                    >
-                      {document.evidenceStatus}
-                    </span>
+                    <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
+                      {documentItems.length}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept=".docx"
+                    onChange={(event) => {
+                      if (event.target.files) {
+                        void handleFiles(event.target.files);
+                      }
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept=".docx"
+                    onChange={(event) => {
+                      if (event.target.files) {
+                        void handleFiles(event.target.files);
+                      }
+                      event.currentTarget.value = "";
+                    }}
+                    {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadState.status === "uploading"}
+                    className={cn(
+                      "rounded-full border px-3 py-2 text-sm transition",
+                      uploadState.status === "uploading"
+                        ? "cursor-not-allowed border-white/6 bg-white/[0.02] text-white/28"
+                        : "border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08] active:scale-[0.98]",
+                    )}
+                  >
+                    Upload Files
                   </button>
                   <button
-                    onClick={(e) => handleDeleteFile(document.id, e)}
-                    className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-500/10 text-rose-400/70 opacity-0 backdrop-blur-md transition-all hover:bg-rose-500/20 hover:text-rose-400 group-hover:opacity-100"
-                    title="Delete file"
+                    onClick={() => folderInputRef.current?.click()}
+                    disabled={uploadState.status === "uploading"}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-full border px-3 py-2 text-sm transition",
+                      uploadState.status === "uploading"
+                        ? "cursor-not-allowed border-white/6 bg-white/[0.02] text-white/28"
+                        : "border-orange-300/18 bg-orange-500/10 text-orange-100 hover:bg-orange-500/14 active:scale-[0.98]",
+                    )}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Upload
+                      className={cn(
+                        "h-4 w-4",
+                        uploadState.status === "uploading" ? "text-white/28" : "text-orange-200",
+                      )}
+                    />
+                    {uploadState.status === "uploading" ? "Uploading..." : "Upload Folder"}
                   </button>
                 </div>
-              ))}
+
+                {uploadState.message ? (
+                  <div
+                    className={cn(
+                      "mt-3 rounded-[16px] border px-3 py-2 text-xs leading-5",
+                      uploadState.status === "failed"
+                        ? "border-rose-400/15 bg-rose-500/10 text-rose-100"
+                        : uploadState.status === "partial_success"
+                          ? "border-amber-300/15 bg-amber-500/10 text-amber-100"
+                          : uploadState.status === "success"
+                            ? "border-emerald-300/15 bg-emerald-500/10 text-emerald-100"
+                            : "border-white/8 bg-white/[0.03] text-white/58",
+                    )}
+                  >
+                    <div>{uploadState.message}</div>
+                    {uploadState.details.slice(0, 2).map((detail) => (
+                      <div key={detail} className="mt-1 text-[11px] text-current/80">
+                        {detail}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="scrollbar-hidden flex-1 min-h-0 space-y-2 overflow-y-auto px-3 py-3">
+                {folderGroups.length === 0 ? (
+                  <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-5 text-sm leading-6 text-white/46">
+                    还没有文档。上传 DOCX 文件后，它们会出现在这里。
+                  </div>
+                ) : null}
+
+                {folderGroups.map((group) => {
+                  const isExpanded = expandedFolders[group.folderPath] ?? true;
+
+                  return (
+                    <div
+                      key={group.folderPath}
+                      className="overflow-hidden rounded-[20px] border border-white/8 bg-black/18"
+                    >
+                      <div className="flex items-center gap-2 px-2 py-2">
+                        <button
+                          onClick={() => toggleFolder(group.folderPath)}
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-[15px] px-2.5 py-2.5 text-left transition hover:bg-white/[0.05]"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/64 transition">
+                            <ChevronRight
+                              className={cn("h-4 w-4 transition-transform duration-200 ease-out", isExpanded ? "rotate-90" : "")}
+                            />
+                          </span>
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-200">
+                            {isExpanded ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-white">{group.folderPath}</div>
+                            <div className="mt-1 text-[11px] text-white/40">
+                              {group.documents.length} file{group.documents.length === 1 ? "" : "s"}
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFolderRemovalError(null);
+                            setFolderPendingRemoval(group);
+                          }}
+                          className="flex shrink-0 items-center gap-2 rounded-full border border-rose-400/15 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/18 active:scale-[0.98]"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </button>
+                      </div>
+
+                      <AnimatePresence initial={false}>
+                        {isExpanded ? (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-1.5 border-t border-white/8 px-2 pb-2 pt-1.5">
+                              {group.documents.map((document) => (
+                                <button
+                                  key={document.id}
+                                  onClick={() => setSelectedDocumentId(document.id)}
+                                  className={cn(
+                                    "flex w-full items-start justify-between gap-3 rounded-[15px] border px-3 py-2.5 text-left transition",
+                                    selectedDocumentId === document.id
+                                      ? "border-orange-300/28 bg-orange-500/12"
+                                      : "border-transparent bg-white/[0.02] hover:bg-white/[0.05]",
+                                  )}
+                                >
+                                  <div className="min-w-0 pr-3">
+                                    <div className="truncate text-sm font-semibold text-white">{document.fileName}</div>
+                                    <div className="mt-1 text-xs text-white/40">{document.uploadedAt}</div>
+                                  </div>
+                                  <span
+                                    className={cn(
+                                      "shrink-0 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
+                                      document.evidenceStatus === "verified"
+                                        ? "bg-emerald-500/12 text-emerald-100"
+                                        : document.evidenceStatus === "conflict"
+                                          ? "bg-amber-500/12 text-amber-100"
+                                          : document.evidenceStatus === "uploaded"
+                                            ? "bg-sky-500/12 text-sky-100"
+                                            : document.evidenceStatus === "rejected"
+                                              ? "bg-rose-500/12 text-rose-100"
+                                              : "bg-white/[0.08] text-white/55",
+                                    )}
+                                  >
+                                    {document.evidenceStatus}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </aside>
+          )}
+        </motion.aside>
       </div>
+
+      <AnimatePresence>
+        {folderPendingRemoval ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/72 px-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={PAGE_TRANSITION}
+              className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#111111]/95 p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/15 bg-rose-500/10 text-rose-200">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold text-white">Remove Folder</div>
+                  <div className="mt-2 text-sm leading-6 text-white/65">
+                    This removes all DOCX files in the selected folder from the current workspace.
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/38">Folder</div>
+                <div className="mt-2 truncate text-sm font-medium text-white">{folderPendingRemoval.folderPath}</div>
+                <div className="mt-1 text-xs text-white/45">
+                  {folderPendingRemoval.documents.length} file{folderPendingRemoval.documents.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              {folderRemovalError ? (
+                <div className="mt-4 rounded-[14px] border border-rose-400/15 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                  {folderRemovalError}
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    if (!isRemovingFolder) {
+                      setFolderPendingRemoval(null);
+                      setFolderRemovalError(null);
+                    }
+                  }}
+                  className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/72 transition hover:bg-white/[0.08]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleConfirmRemoveFolder()}
+                  disabled={isRemovingFolder}
+                  className={cn(
+                    "rounded-full px-4 py-2 text-sm font-medium text-white transition",
+                    isRemovingFolder
+                      ? "bg-rose-500/40 text-white/70"
+                      : "bg-rose-500/85 hover:bg-rose-500 active:scale-[0.98]",
+                  )}
+                >
+                  {isRemovingFolder ? "Removing..." : "Remove Folder"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 }

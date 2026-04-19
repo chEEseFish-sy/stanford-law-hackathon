@@ -444,6 +444,19 @@ class GeminiExtractor:
         text = getattr(response, "text", None) or ""
         return parse_json_response(text)
 
+    def generate_text(self, prompt: str) -> str:
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=self.types.GenerateContentConfig(
+                temperature=0.2,
+            ),
+        )
+        text = (getattr(response, "text", None) or "").strip()
+        if not text:
+            raise ValueError("Gemini response was empty")
+        return text
+
 
 def parse_json_response(text: str) -> dict[str, Any]:
     text = text.strip()

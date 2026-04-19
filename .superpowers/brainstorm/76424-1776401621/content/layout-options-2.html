@@ -1,0 +1,123 @@
+<h2>A 方案细化：默认空状态</h2>
+<p class="subtitle">按你最新要求，进入页面时先不显示具体文档内容，但中间仍然完整预留文档阅读区。下面是 3 种空状态处理方式。</p>
+
+<div class="cards">
+  <div class="card" data-choice="empty-a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;min-height:390px;display:flex;gap:12px;">
+        <div style="width:248px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);display:flex;flex-direction:column;">
+          <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;letter-spacing:.14em;color:#f7c58a;text-transform:uppercase;">AI Chat</div>
+          <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <div style="height:56px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+            <div style="height:56px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+            <div style="height:56px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+          </div>
+        </div>
+        <div style="flex:1;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#050505;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:11px;letter-spacing:.18em;color:#f7c58a;text-transform:uppercase;">Document Reader</div>
+            <div style="display:flex;gap:10px;align-items:center;color:rgba(255,255,255,.3);">
+              <div style="width:34px;height:34px;border-radius:999px;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;">&lt;</div>
+              <div style="font-size:12px;">0 / 0</div>
+              <div style="width:34px;height:34px;border-radius:999px;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;">&gt;</div>
+            </div>
+          </div>
+          <div style="flex:1;padding:18px;">
+            <div style="height:100%;border-radius:16px;border:1px dashed rgba(255,255,255,.14);background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;">
+              <div>
+                <div style="font-size:15px;font-weight:600;color:#ffffff;">文档阅读区已就绪</div>
+                <div style="margin-top:10px;font-size:13px;line-height:1.8;color:rgba(255,255,255,.52);">从右侧 <span style="color:#f7c58a;">Files</span> 选择一份文档后，<br>这里将进入左右翻页阅读模式。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="width:272px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);display:flex;flex-direction:column;">
+          <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:12px;letter-spacing:.14em;color:#f7c58a;text-transform:uppercase;">Files</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.45);">12</div>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="height:58px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+            <div style="height:58px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+            <div style="height:58px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A1. 极简空状态</h3>
+      <p>中间只保留一个安静的提示，不抢视觉。文档区完整留白，最强调“阅读区是核心”。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="empty-b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;min-height:390px;display:flex;gap:12px;">
+        <div style="width:248px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);"></div>
+        <div style="flex:1;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#050505;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;letter-spacing:.18em;color:#f7c58a;text-transform:uppercase;">Document Reader</div>
+          <div style="flex:1;padding:18px;">
+            <div style="height:100%;border-radius:16px;border:1px solid rgba(255,181,120,.14);background:rgba(255,181,120,.05);display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;">
+              <div style="max-width:360px;">
+                <div style="font-size:15px;font-weight:600;color:#ffffff;">开始阅读一份文档</div>
+                <div style="margin-top:10px;font-size:13px;line-height:1.8;color:rgba(255,255,255,.58);">从右侧选择文件，或点击上传按钮导入新文档。进入后使用左右箭头切换页码。</div>
+                <div style="margin-top:16px;display:flex;justify-content:center;gap:10px;">
+                  <div style="padding:10px 16px;border-radius:999px;background:rgba(255,181,120,.16);color:#f7c58a;font-size:12px;">选择文件</div>
+                  <div style="padding:10px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.72);font-size:12px;">上传文档</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="width:272px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A2. 引导操作空状态</h3>
+      <p>中间会给出更明确的动作提示。对首次进入更友好，但比 A1 更占视觉注意力。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="empty-c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0b0b0b;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;min-height:390px;display:flex;gap:12px;">
+        <div style="width:248px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);"></div>
+        <div style="flex:1;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#050505;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;letter-spacing:.18em;color:#f7c58a;text-transform:uppercase;">Document Reader</div>
+          <div style="flex:1;padding:18px;">
+            <div style="height:100%;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;padding:28px;">
+              <div style="width:76%;max-width:560px;border-radius:18px;border:1px solid rgba(255,255,255,.08);background:#121212;padding:18px 20px;">
+                <div style="font-size:13px;font-weight:600;color:#ffffff;">最近打开</div>
+                <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+                  <div style="height:54px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+                  <div style="height:54px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+                  <div style="height:54px;border-radius:12px;background:rgba(255,255,255,.05);"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="width:272px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A3. 最近文档入口</h3>
+      <p>中间空状态里直接给最近文档列表，进入速度快，但会削弱“空白阅读舞台”的纯净感。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我当前推荐</h3>
+  <p>推荐 <strong>A1 极简空状态</strong>。它最符合“核心区尽量留给文档文本”的目标，即使默认没打开文档，也不会把中央区域变成另一个功能面板。</p>
+</div>
+
+<div class="section">
+  <h3>最终收敛后的设计骨架</h3>
+  <p>左侧固定宽度 <strong>AI Chat</strong>，右侧固定宽度 <strong>Files</strong>，中间为唯一核心阅读区；去掉 <strong>History</strong>、去掉所有拖拽分隔条；阅读时用顶部左右页码控制切换真实页，不再纵向长滚动。</p>
+</div>
+
+<div class="section">
+  <h3>请确认这一节</h3>
+  <p>如果你认可，回复 <strong>A1 / A2 / A3</strong>，或者直接回复“按推荐继续”。我就把完整设计整理成规格文档。</p>
+</div>
