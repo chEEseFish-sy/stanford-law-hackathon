@@ -24,6 +24,10 @@ DEFAULT_OUTPUT_DIR = ROOT_DIR / "storage"
 DB_PATH = DEFAULT_OUTPUT_DIR / "vericap.sqlite3"
 MIN_CAPTABLE_SHARE_COUNT = 1_000
 ROOT_FOLDER_NAME = "Root"
+DEFAULT_CASE_NAME = "Private financing audit"
+DELETION_STATUS_PENDING = "pending"
+DELETION_STATUS_COMPLETED = "completed"
+DELETION_STATUS_FAILED = "failed"
 
 
 def utc_now() -> str:
@@ -36,6 +40,13 @@ def connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def captable_summary(document_count: int, row_count: int, projection_count: int) -> str:
+    return (
+        f"Generated from {document_count} document(s). "
+        f"{row_count} cap table row(s) across {projection_count} projection(s), all traceable to extracted events."
+    )
 
 
 def init_store() -> None:
@@ -77,6 +88,40 @@ def init_store() -> None:
               evidence_findings_json TEXT NOT NULL,
               ai_explanation TEXT NOT NULL,
               raw_json TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS document_facts (
+              id TEXT PRIMARY KEY,
+              case_id TEXT NOT NULL REFERENCES cases(id),
+              document_id TEXT NOT NULL REFERENCES files(id),
+              fact_type TEXT NOT NULL,
+              label TEXT NOT NULL,
+              value_json TEXT NOT NULL,
+              source_location TEXT NOT NULL,
+              source_text TEXT NOT NULL,
+              confidence REAL NOT NULL,
+              created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS equity_events (
+              id TEXT PRIMARY KEY,
+              case_id TEXT NOT NULL REFERENCES cases(id),
+              document_id TEXT NOT NULL REFERENCES files(id),
+              event_type TEXT NOT NULL,
+              effective_date TEXT,
+              holder_name TEXT NOT NULL,
+              counterparty_name TEXT,
+              security_type TEXT NOT NULL,
+              share_class TEXT,
+              series TEXT,
+              quantity REAL NOT NULL,
+              unit_price REAL,
+              amount REAL,
+              status TEXT NOT NULL,
+              source_evidence_ids_json TEXT NOT NULL,
+              confidence REAL NOT NULL,
+              review_status TEXT NOT NULL,
               created_at TEXT NOT NULL
             );
 
@@ -143,9 +188,33 @@ def init_store() -> None:
               content TEXT NOT NULL,
               created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS deletion_events (
+              id TEXT PRIMARY KEY,
+              scope_type TEXT NOT NULL,
+              case_id TEXT NOT NULL,
+              scope_ref TEXT NOT NULL,
+              removed_file_count INTEGER NOT NULL,
+              removed_structured_result_count INTEGER NOT NULL,
+              removed_captable_version_count INTEGER NOT NULL,
+              removed_message_count INTEGER NOT NULL,
+              status TEXT NOT NULL,
+              requested_at TEXT NOT NULL,
+              completed_at TEXT,
+              error_message TEXT
+            );
             """
         )
         ensure_column(conn, "files", "relative_path", "TEXT")
+        ensure_column(conn, "files", "artifact_paths_json", "TEXT")
+        ensure_column(conn, "captable_rows", "event_ids_json", "TEXT")
+        ensure_column(conn, "captable_rows", "evidence_ids_json", "TEXT")
+        ensure_column(conn, "captable_rows", "confidence", "REAL")
+        ensure_column(conn, "captable_rows", "review_status", "TEXT")
+        ensure_column(conn, "captable_rows", "view_type", "TEXT")
+        ensure_column(conn, "captable_rows", "event_status", "TEXT")
+        ensure_column(conn, "captable_rows", "share_class", "TEXT")
+        ensure_column(conn, "captable_rows", "series", "TEXT")
 
     seed_if_empty()
     rebuild_generated_captables()
@@ -157,7 +226,7 @@ def seed_if_empty() -> None:
     if count:
         return
 
-    create_case(DEFAULT_CASE_ID, "Default financing audit")
+    create_case(DEFAULT_CASE_ID, DEFAULT_CASE_NAME)
 
 
 def create_case(case_id: str, name: str) -> None:
@@ -173,6 +242,12 @@ def create_case(case_id: str, name: str) -> None:
         )
 
 
+def case_exists(case_id: str) -> bool:
+    with connect() as conn:
+        row = conn.execute("SELECT 1 FROM cases WHERE id = ?", (case_id,)).fetchone()
+    return row is not None
+
+
 def ingest_processed_result(
     case_id: str,
     result: dict[str, Any],
@@ -180,7 +255,7 @@ def ingest_processed_result(
     relative_path: str | None = None,
     stable_id: str | None = None,
 ) -> dict[str, Any]:
-    create_case(case_id, "Default financing audit")
+    create_case(case_id, DEFAULT_CASE_NAME)
     now = utc_now()
     source_file = str(result.get("source_file") or Path(source_path).name)
     document_id = unique_id(stable_id or f"file-{safe_stem(Path(source_file))}")
@@ -190,14 +265,15 @@ def ingest_processed_result(
     evidence_status = infer_evidence_status(result, file_type)
     transaction_date = infer_transaction_date(result)
     summary = build_document_summary(result, document_title, file_type)
+    artifact_paths = document_artifact_paths(source_path)
 
     with connect() as conn:
         conn.execute(
             """
             INSERT INTO files
             (id, case_id, file_name, file_type, transaction_date, uploaded_at, source_path,
-             relative_path, storage_provider, processing_status, evidence_status, summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?)
+             relative_path, artifact_paths_json, storage_provider, processing_status, evidence_status, summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?)
             """,
             (
                 document_id,
@@ -208,6 +284,7 @@ def ingest_processed_result(
                 now,
                 source_path,
                 normalize_relative_path(relative_path),
+                json.dumps([str(path) for path in artifact_paths], ensure_ascii=False),
                 processing_status,
                 evidence_status,
                 summary,
@@ -237,6 +314,8 @@ def ingest_processed_result(
                 now,
             ),
         )
+        fact_ids = insert_document_facts(conn, case_id, document_id, result, file_type, now)
+        insert_equity_events(conn, case_id, document_id, result, file_type, fact_ids, now)
 
         current_trunk = get_case_field(conn, case_id, "current_trunk_node_id")
         parent_id = current_trunk
@@ -362,12 +441,453 @@ def create_captable_version(
             parent_version["id"] if parent_version else None,
             f"Working version · {label}",
             json.dumps(document_ids, ensure_ascii=False),
-            f"Generated from {len(document_ids)} document(s). Rows are evidence-backed demo calculations.",
+            captable_summary(len(document_ids), 0, 0),
             now,
         ),
     )
     write_captable_rows(conn, case_id, cap_version_id, document_ids)
+    row_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM captable_rows WHERE version_id = ?",
+        (cap_version_id,),
+    ).fetchone()["count"]
+    projection_count = conn.execute(
+        "SELECT COUNT(DISTINCT view_type) AS count FROM captable_rows WHERE version_id = ?",
+        (cap_version_id,),
+    ).fetchone()["count"]
+    conn.execute(
+        "UPDATE captable_versions SET summary = ? WHERE id = ?",
+        (captable_summary(len(document_ids), row_count, projection_count), cap_version_id),
+    )
     return cap_node_id, cap_version_id
+
+
+def insert_document_facts(
+    conn: sqlite3.Connection,
+    case_id: str,
+    document_id: str,
+    result: dict[str, Any],
+    file_type: str,
+    now: str,
+) -> list[str]:
+    facts = build_document_facts(result, file_type)
+    fact_ids: list[str] = []
+    for fact in facts:
+        fact_id = unique_id("fact")
+        fact_ids.append(fact_id)
+        conn.execute(
+            """
+            INSERT INTO document_facts
+            (id, case_id, document_id, fact_type, label, value_json, source_location, source_text, confidence, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                fact_id,
+                case_id,
+                document_id,
+                fact["fact_type"],
+                fact["label"],
+                json.dumps(fact["value"], ensure_ascii=False),
+                fact["source_location"],
+                fact["source_text"],
+                fact["confidence"],
+                now,
+            ),
+        )
+    return fact_ids
+
+
+def insert_equity_events(
+    conn: sqlite3.Connection,
+    case_id: str,
+    document_id: str,
+    result: dict[str, Any],
+    file_type: str,
+    fact_ids: list[str],
+    now: str,
+) -> list[str]:
+    events = build_equity_events(result, file_type, fact_ids)
+    event_ids: list[str] = []
+    for event in events:
+        event_id = unique_id("event")
+        event_ids.append(event_id)
+        conn.execute(
+            """
+            INSERT INTO equity_events
+            (id, case_id, document_id, event_type, effective_date, holder_name, counterparty_name, security_type,
+             share_class, series, quantity, unit_price, amount, status, source_evidence_ids_json, confidence,
+             review_status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_id,
+                case_id,
+                document_id,
+                event["event_type"],
+                event["effective_date"],
+                event["holder_name"],
+                event["counterparty_name"],
+                event["security_type"],
+                event["share_class"],
+                event["series"],
+                event["quantity"],
+                event["unit_price"],
+                event["amount"],
+                event["status"],
+                json.dumps(event["source_evidence_ids"], ensure_ascii=False),
+                event["confidence"],
+                event["review_status"],
+                now,
+            ),
+        )
+    return event_ids
+
+
+def build_document_facts(result: dict[str, Any], file_type: str) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    facts.extend(build_party_facts(result))
+    facts.extend(build_date_facts(result))
+    facts.extend(build_security_facts(result))
+    facts.extend(build_holder_facts(result))
+    facts.extend(build_transaction_facts(result))
+    facts.extend(build_raw_candidate_facts(result))
+    facts.extend(build_table_facts(result))
+
+    if not facts:
+        facts.append(
+            {
+                "fact_type": "document_summary",
+                "label": file_type,
+                "value": {"document_type": infer_transaction_type(result, file_type)},
+                "source_location": "document",
+                "source_text": build_document_summary(result, result.get("document_title") or "Untitled document", file_type),
+                "confidence": 0.4,
+            }
+        )
+    return facts
+
+
+def build_party_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    parties = result.get("parties") if isinstance(result.get("parties"), list) else []
+    for item in parties:
+        if isinstance(item, dict):
+            evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+            source_location, source_text = evidence_to_source(evidence)
+            facts.append(
+                {
+                    "fact_type": "party",
+                    "label": str(item.get("name") or item.get("role") or "party"),
+                    "value": item,
+                    "source_location": source_location,
+                    "source_text": source_text,
+                    "confidence": 0.78,
+                }
+            )
+    return facts
+
+
+def build_date_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    dates = result.get("dates") if isinstance(result.get("dates"), list) else []
+    for item in dates:
+        if isinstance(item, dict):
+            evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+            source_location, source_text = evidence_to_source(evidence)
+            facts.append(
+                {
+                    "fact_type": "date",
+                    "label": str(item.get("meaning") or item.get("date_original") or "date"),
+                    "value": item,
+                    "source_location": source_location,
+                    "source_text": source_text,
+                    "confidence": 0.74,
+                }
+            )
+    return facts
+
+
+def build_security_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    security_facts = result.get("security_facts") if isinstance(result.get("security_facts"), list) else []
+    for item in security_facts:
+        if isinstance(item, dict):
+            evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+            source_location, source_text = evidence_to_source(evidence)
+            label = " ".join(
+                value
+                for value in [str(item.get("series") or "").strip(), str(item.get("security_type") or "").strip()]
+                if value
+            ) or "security fact"
+            facts.append(
+                {
+                    "fact_type": "security",
+                    "label": label,
+                    "value": item,
+                    "source_location": source_location,
+                    "source_text": source_text,
+                    "confidence": 0.76,
+                }
+            )
+    return facts
+
+
+def build_holder_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    holder_facts = result.get("holder_facts") if isinstance(result.get("holder_facts"), list) else []
+    for item in holder_facts:
+        if isinstance(item, dict):
+            evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+            source_location, source_text = evidence_to_source(evidence)
+            facts.append(
+                {
+                    "fact_type": "holder",
+                    "label": str(item.get("holder_name") or "holder fact"),
+                    "value": item,
+                    "source_location": source_location,
+                    "source_text": source_text,
+                    "confidence": 0.76,
+                }
+            )
+    return facts
+
+
+def build_transaction_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    transaction_facts = result.get("transaction_facts") if isinstance(result.get("transaction_facts"), list) else []
+    for item in transaction_facts:
+        if isinstance(item, dict):
+            evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+            source_location, source_text = evidence_to_source(evidence)
+            facts.append(
+                {
+                    "fact_type": "transaction",
+                    "label": str(item.get("event_type") or "transaction fact"),
+                    "value": item,
+                    "source_location": source_location,
+                    "source_text": source_text,
+                    "confidence": 0.8,
+                }
+            )
+    return facts
+
+
+def build_raw_candidate_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    raw = result.get("raw_candidates", {}) if isinstance(result.get("raw_candidates"), dict) else {}
+    for fact_type, key in [("share_candidate", "share_counts"), ("money_candidate", "money"), ("date_candidate", "dates")]:
+        values = raw.get(key) if isinstance(raw.get(key), list) else []
+        for item in values[:24]:
+            if not isinstance(item, dict):
+                continue
+            facts.append(
+                {
+                    "fact_type": fact_type,
+                    "label": str(item.get("value") or fact_type),
+                    "value": item,
+                    "source_location": f"paragraph {item.get('paragraph_id', 'unknown')}",
+                    "source_text": str(item.get("source_text") or ""),
+                    "confidence": 0.62,
+                }
+            )
+    return facts
+
+
+def build_table_facts(result: dict[str, Any]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    table_facts = result.get("table_facts") if isinstance(result.get("table_facts"), list) else []
+    for item in table_facts[:20]:
+        if not isinstance(item, dict):
+            continue
+        facts.append(
+            {
+                "fact_type": "table",
+                "label": "table rows",
+                "value": item,
+                "source_location": f"paragraph {item.get('paragraph_id', 'unknown')}",
+                "source_text": str(item.get("source_text") or ""),
+                "confidence": 0.68,
+            }
+        )
+    return facts
+
+
+def build_equity_events(result: dict[str, Any], file_type: str, fact_ids: list[str]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    events.extend(build_explicit_transaction_events(result, file_type, fact_ids))
+    events.extend(build_holder_events(result, file_type, fact_ids))
+    events.extend(build_regex_candidate_events(result, file_type, fact_ids))
+    events.extend(build_llm_share_amount_events(result, file_type, fact_ids))
+    return dedupe_equity_events(events)
+
+
+def build_explicit_transaction_events(result: dict[str, Any], file_type: str, fact_ids: list[str]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    transaction_facts = result.get("transaction_facts") if isinstance(result.get("transaction_facts"), list) else []
+    for item in transaction_facts:
+        if not isinstance(item, dict):
+            continue
+        event_type = str(item.get("event_type") or infer_event_type(file_type))
+        share_class = str(item.get("share_class") or "")
+        status_hint = str(item.get("status") or "").strip() or None
+        source_text = extract_evidence_text(item.get("evidence"))
+        quantity = parse_number(str(item.get("quantity") or item.get("share_count") or "0"))
+        if quantity <= 0:
+            continue
+        events.append(
+            equity_event(
+                event_type=event_type,
+                effective_date=str(item.get("date_iso") or "") or infer_transaction_date(result),
+                holder_name=str(item.get("holder_name") or "Unknown holder"),
+                security_type=str(item.get("security_type") or infer_security_type(result.get("document_title") or "")),
+                share_class=share_class,
+                series=str(item.get("series") or ""),
+                quantity=quantity,
+                unit_price=parse_optional_number(item.get("unit_price")),
+                amount=parse_optional_number(item.get("amount")),
+                status=normalize_event_status(
+                    file_type=file_type,
+                    event_type=event_type,
+                    share_class=share_class,
+                    context="transaction_fact",
+                    source_text=source_text,
+                    status_hint=status_hint,
+                ),
+                source_evidence_ids=fact_ids,
+                confidence=0.84,
+                review_status="needs_review",
+            )
+        )
+    return events
+
+
+def build_holder_events(result: dict[str, Any], file_type: str, fact_ids: list[str]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    holder_facts = result.get("holder_facts") if isinstance(result.get("holder_facts"), list) else []
+    for item in holder_facts:
+        if not isinstance(item, dict):
+            continue
+        event_type = normalize_holder_event_type(str(item.get("security_type") or ""), str(item.get("share_class") or ""))
+        share_class = str(item.get("share_class") or "")
+        source_text = extract_evidence_text(item.get("evidence"))
+        quantity = parse_number(str(item.get("share_count") or "0"))
+        if quantity <= 0:
+            continue
+        events.append(
+            equity_event(
+                event_type=event_type,
+                effective_date=infer_transaction_date(result),
+                holder_name=str(item.get("holder_name") or "Unknown holder"),
+                security_type=str(item.get("security_type") or infer_security_type(result.get("document_title") or "")),
+                share_class=share_class,
+                series=str(item.get("series") or ""),
+                quantity=quantity,
+                unit_price=parse_optional_number(item.get("unit_price") or item.get("price_per_share")),
+                amount=parse_optional_number(item.get("cash_paid")),
+                status=normalize_event_status(
+                    file_type=file_type,
+                    event_type=event_type,
+                    share_class=share_class,
+                    context="holder_fact",
+                    source_text=source_text,
+                ),
+                source_evidence_ids=fact_ids,
+                confidence=0.78,
+                review_status="needs_review",
+            )
+        )
+    return events
+
+
+def build_regex_candidate_events(result: dict[str, Any], file_type: str, fact_ids: list[str]) -> list[dict[str, Any]]:
+    raw = result.get("raw_candidates", {}) if isinstance(result.get("raw_candidates"), dict) else {}
+    share_candidates = raw.get("share_counts") if isinstance(raw.get("share_counts"), list) else []
+    events: list[dict[str, Any]] = []
+    for candidate in share_candidates:
+        if not isinstance(candidate, dict):
+            continue
+        source_text = str(candidate.get("source_text") or "")
+        location = f"paragraph {candidate.get('paragraph_id', 'unknown')}"
+        text = clean_capitalization_text(source_text)
+        events.extend(extract_common_outstanding_events(text, file_type, location, fact_ids, result))
+        events.extend(extract_preferred_outstanding_events(text, file_type, location, fact_ids, result))
+        events.extend(extract_stock_plan_events(text, file_type, location, fact_ids, result))
+        events.extend(extract_minimum_closing_events(text, file_type, location, fact_ids, result))
+    return events
+
+
+def build_llm_share_amount_events(result: dict[str, Any], file_type: str, fact_ids: list[str]) -> list[dict[str, Any]]:
+    financing_terms = result.get("financing_terms", {}) if isinstance(result.get("financing_terms"), dict) else {}
+    share_amounts = financing_terms.get("share_amounts")
+    if not isinstance(share_amounts, list):
+        return []
+    events: list[dict[str, Any]] = []
+    for index, value in enumerate(share_amounts[:12], start=1):
+        shares = parse_number(json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else str(value))
+        if shares < MIN_CAPTABLE_SHARE_COUNT:
+            continue
+        holder = extract_named_value(value, ["holder", "holder_name", "purchaser", "stockholder", "party"]) or f"Extracted holder {index}"
+        security = extract_named_value(value, ["security", "security_type", "security_class", "class", "series"]) or infer_security_type(result.get("document_title") or "")
+        share_class = extract_named_value(value, ["share_class", "security_class", "class"]) or ""
+        event_type = normalize_holder_event_type(security, share_class)
+        events.append(
+            equity_event(
+                event_type=event_type,
+                effective_date=infer_transaction_date(result),
+                holder_name=holder,
+                security_type=security,
+                share_class=share_class,
+                series=infer_series(security),
+                quantity=shares,
+                unit_price=None,
+                amount=None,
+                status=normalize_event_status(
+                    file_type=file_type,
+                    event_type=event_type,
+                    share_class=share_class,
+                    context="llm_share_amount",
+                    source_text=json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else str(value),
+                ),
+                source_evidence_ids=fact_ids,
+                confidence=0.66,
+                review_status="needs_review",
+            )
+        )
+    return events
+
+
+def equity_event(
+    *,
+    event_type: str,
+    effective_date: str | None,
+    holder_name: str,
+    security_type: str,
+    share_class: str,
+    series: str,
+    quantity: float,
+    unit_price: float | None,
+    amount: float | None,
+    status: str,
+    source_evidence_ids: list[str],
+    confidence: float,
+    review_status: str,
+    counterparty_name: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "event_type": event_type,
+        "effective_date": effective_date,
+        "holder_name": holder_name,
+        "counterparty_name": counterparty_name,
+        "security_type": security_type,
+        "share_class": share_class,
+        "series": series,
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "amount": amount,
+        "status": status,
+        "source_evidence_ids": source_evidence_ids[:12],
+        "confidence": confidence,
+        "review_status": review_status,
+    }
 
 
 def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
@@ -375,7 +895,7 @@ def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
     with connect() as conn:
         case = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
         if not case:
-            create_case(case_id, "Default financing audit")
+            create_case(case_id, DEFAULT_CASE_NAME)
             case = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
 
         documents = [document_payload(row) for row in conn.execute("SELECT * FROM files WHERE case_id = ? ORDER BY uploaded_at", (case_id,))]
@@ -441,135 +961,299 @@ def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
     }
 
 
-def remove_folder(case_id: str, folder_path: str) -> dict[str, Any]:
-    normalized_folder = normalize_folder_path(folder_path)
-    if not normalized_folder:
-        raise ValueError("Folder path is required")
-
-    with connect() as conn:
-        if normalized_folder == ROOT_FOLDER_NAME:
-            file_rows = conn.execute(
+def get_case_file_rows(conn: sqlite3.Connection, case_id: str, folder_path: str | None = None) -> list[sqlite3.Row]:
+    if folder_path is None:
+        return list(conn.execute("SELECT * FROM files WHERE case_id = ? ORDER BY uploaded_at", (case_id,)))
+    if folder_path == ROOT_FOLDER_NAME:
+        return list(
+            conn.execute(
                 """
-                SELECT id, relative_path, source_path
-                FROM files
+                SELECT * FROM files
                 WHERE case_id = ?
                   AND (relative_path IS NULL OR relative_path = '')
+                ORDER BY uploaded_at
                 """,
                 (case_id,),
-            ).fetchall()
-        else:
-            file_rows = conn.execute(
-                """
-                SELECT id, relative_path, source_path
-                FROM files
-                WHERE case_id = ?
-                  AND relative_path IS NOT NULL
-                  AND relative_path != ''
-                  AND (relative_path = ? OR relative_path LIKE ?)
-                """,
-                (case_id, normalized_folder, f"{normalized_folder}/%"),
-            ).fetchall()
-        if not file_rows:
-            raise KeyError(normalized_folder)
-
-        document_ids = [row["id"] for row in file_rows]
-        document_nodes = conn.execute(
+            )
+        )
+    return list(
+        conn.execute(
             """
-            SELECT id FROM topology_nodes
-            WHERE case_id = ? AND entity_type = 'file' AND entity_id IN ({})
-            """.format(",".join("?" for _ in document_ids)),
-            (case_id, *document_ids),
-        ).fetchall()
-        document_node_ids = [row["id"] for row in document_nodes]
+            SELECT * FROM files
+            WHERE case_id = ?
+              AND relative_path IS NOT NULL
+              AND relative_path != ''
+              AND (relative_path = ? OR relative_path LIKE ?)
+            ORDER BY uploaded_at
+            """,
+            (case_id, folder_path, f"{folder_path}/%"),
+        )
+    )
 
-        derived_cap_rows = []
-        if document_node_ids:
-            derived_cap_rows = conn.execute(
-                """
+
+def collect_deletion_scope(conn: sqlite3.Connection, case_id: str, scope_type: str, scope_ref: str) -> dict[str, Any]:
+    case_row = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
+    if not case_row:
+        raise KeyError(case_id)
+
+    file_rows = get_case_file_rows(conn, case_id, scope_ref if scope_type == "folder" else None)
+    if scope_type == "folder" and not file_rows:
+        raise KeyError(scope_ref)
+
+    document_ids = [row["id"] for row in file_rows]
+    document_node_ids: list[str] = []
+    if document_ids:
+        placeholders = ",".join("?" for _ in document_ids)
+        document_node_ids = [
+            row["id"]
+            for row in conn.execute(
+                f"""
+                SELECT id FROM topology_nodes
+                WHERE case_id = ? AND entity_type = 'file' AND entity_id IN ({placeholders})
+                """,
+                (case_id, *document_ids),
+            )
+        ]
+
+    cap_node_ids: list[str] = []
+    cap_version_ids: list[str] = []
+    if scope_type == "case":
+        cap_rows = list(conn.execute("SELECT topology_node_id, id FROM captable_versions WHERE case_id = ?", (case_id,)))
+        cap_node_ids = [row["topology_node_id"] for row in cap_rows]
+        cap_version_ids = [row["id"] for row in cap_rows]
+    elif document_node_ids:
+        placeholders = ",".join("?" for _ in document_node_ids)
+        derived_cap_rows = list(
+            conn.execute(
+                f"""
                 SELECT id, entity_id
                 FROM topology_nodes
                 WHERE case_id = ?
                   AND node_type = 'captable_version'
-                  AND parent_id IN ({})
-                """.format(",".join("?" for _ in document_node_ids)),
+                  AND parent_id IN ({placeholders})
+                """,
                 (case_id, *document_node_ids),
-            ).fetchall()
-
+            )
+        )
         cap_node_ids = [row["id"] for row in derived_cap_rows]
         cap_version_ids = [row["entity_id"] for row in derived_cap_rows]
-        now = utc_now()
-        source_paths = {row["source_path"] for row in file_rows if row["source_path"]}
 
-        if cap_version_ids:
-            conn.execute(
-                "DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({})".format(",".join("?" for _ in cap_node_ids)),
-                (case_id, *cap_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM captable_versions WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in cap_version_ids)),
-                (case_id, *cap_version_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({0}) OR to_node_id IN ({0}))".format(
-                    ",".join("?" for _ in cap_node_ids)
-                ),
-                (case_id, *cap_node_ids, *cap_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_nodes WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in cap_node_ids)),
-                (case_id, *cap_node_ids),
-            )
-
-        if document_node_ids:
-            conn.execute(
-                "DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({})".format(",".join("?" for _ in document_node_ids)),
-                (case_id, *document_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({0}) OR to_node_id IN ({0}))".format(
-                    ",".join("?" for _ in document_node_ids)
-                ),
-                (case_id, *document_node_ids, *document_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_nodes WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in document_node_ids)),
-                (case_id, *document_node_ids),
-            )
-
-        conn.execute(
-            "DELETE FROM structured_results WHERE case_id = ? AND document_id IN ({})".format(",".join("?" for _ in document_ids)),
-            (case_id, *document_ids),
-        )
-        conn.execute(
-            "DELETE FROM files WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in document_ids)),
-            (case_id, *document_ids),
-        )
-        conn.execute(
-            """
-            INSERT INTO operation_logs (id, case_id, action, node_id, description, created_at)
-            VALUES (?, ?, 'archive', ?, ?, ?)
-            """,
-            (
-                unique_id("log-folder-remove"),
-                case_id,
-                normalized_folder,
-                f"Removed folder {normalized_folder} and its uploaded documents.",
-                now,
-            ),
-        )
-        reset_case_head_pointers(conn, case_id, now)
-        rebuild_case_captable_versions(conn, case_id)
-
-    remove_document_artifacts(source_paths)
+    message_rows = list(conn.execute("SELECT id FROM case_messages WHERE case_id = ?", (case_id,)))
+    artifact_paths = document_artifact_paths_from_rows(file_rows)
+    structured_result_count = count_ids(conn, "structured_results", "document_id", case_id, document_ids)
 
     return {
-        "removedFileCount": len(document_ids),
-        "workbench": build_workbench_snapshot(case_id),
+        "case": case_row,
+        "file_rows": file_rows,
+        "document_ids": document_ids,
+        "document_node_ids": document_node_ids,
+        "cap_node_ids": cap_node_ids,
+        "cap_version_ids": cap_version_ids,
+        "message_ids": [row["id"] for row in message_rows],
+        "artifact_paths": artifact_paths,
+        "counts": {
+            "files": len(file_rows),
+            "structuredResults": structured_result_count if scope_type == "folder" else count_rows(conn, "structured_results", case_id),
+            "captableVersions": len(cap_version_ids),
+            "messages": len(message_rows),
+        },
     }
 
 
+def perform_case_deletion(case_id: str, scope_type: str, scope_ref: str) -> dict[str, Any]:
+    init_store()
+    requested_at = utc_now()
+
+    with connect() as conn:
+        scope = collect_deletion_scope(conn, case_id, scope_type, scope_ref)
+        deletion_event_id = unique_id("deletion")
+        create_deletion_event(conn, deletion_event_id, case_id, scope_type, scope_ref, scope["counts"], requested_at)
+
+        if scope_type == "case":
+            delete_case_records(conn, case_id)
+        else:
+            delete_folder_records(conn, case_id, scope_ref, scope, requested_at)
+
+    file_errors = remove_document_artifacts(scope["artifact_paths"])
+    if file_errors:
+        error_message = "; ".join(file_errors)
+        mark_deletion_event_failed(deletion_event_id, error_message)
+        raise RuntimeError(f"Failed to complete physical deletion. deletion_event_id={deletion_event_id}. {error_message}")
+
+    mark_deletion_event_completed(deletion_event_id)
+    return {
+        "scopeType": scope_type,
+        "scopeRef": scope_ref,
+        "removedCounts": scope["counts"],
+        "deletionEventId": deletion_event_id,
+        "workbench": build_workbench_snapshot(case_id) if scope_type == "folder" else None,
+    }
+
+
+def create_deletion_event(
+    conn: sqlite3.Connection,
+    deletion_event_id: str,
+    case_id: str,
+    scope_type: str,
+    scope_ref: str,
+    counts: dict[str, int],
+    requested_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO deletion_events
+        (id, scope_type, case_id, scope_ref, removed_file_count, removed_structured_result_count,
+         removed_captable_version_count, removed_message_count, status, requested_at, completed_at, error_message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+        """,
+        (
+            deletion_event_id,
+            scope_type,
+            case_id,
+            scope_ref,
+            counts["files"],
+            counts["structuredResults"],
+            counts["captableVersions"],
+            counts["messages"],
+            DELETION_STATUS_PENDING,
+            requested_at,
+        ),
+    )
+
+
+def mark_deletion_event_completed(deletion_event_id: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE deletion_events SET status = ?, completed_at = ?, error_message = NULL WHERE id = ?",
+            (DELETION_STATUS_COMPLETED, utc_now(), deletion_event_id),
+        )
+
+
+def mark_deletion_event_failed(deletion_event_id: str, error_message: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE deletion_events SET status = ?, completed_at = ?, error_message = ? WHERE id = ?",
+            (DELETION_STATUS_FAILED, utc_now(), error_message, deletion_event_id),
+        )
+
+
+def delete_folder_records(
+    conn: sqlite3.Connection,
+    case_id: str,
+    folder_path: str,
+    scope: dict[str, Any],
+    now: str,
+) -> None:
+    document_ids = scope["document_ids"]
+    document_node_ids = scope["document_node_ids"]
+    cap_node_ids = scope["cap_node_ids"]
+    cap_version_ids = scope["cap_version_ids"]
+
+    if cap_version_ids:
+        delete_operation_logs_for_nodes(conn, case_id, cap_node_ids)
+        delete_refs_for_nodes(conn, case_id, cap_node_ids)
+        delete_ids(conn, "captable_versions", "id", case_id, cap_version_ids)
+        delete_ids(conn, "topology_nodes", "id", case_id, cap_node_ids)
+
+    if document_node_ids:
+        delete_operation_logs_for_nodes(conn, case_id, document_node_ids)
+        delete_refs_for_nodes(conn, case_id, document_node_ids)
+        delete_ids(conn, "topology_nodes", "id", case_id, document_node_ids)
+
+    delete_ids(conn, "structured_results", "document_id", case_id, document_ids)
+    delete_ids(conn, "equity_events", "document_id", case_id, document_ids)
+    delete_ids(conn, "document_facts", "document_id", case_id, document_ids)
+    delete_ids(conn, "files", "id", case_id, document_ids)
+    conn.execute("DELETE FROM case_messages WHERE case_id = ?", (case_id,))
+    conn.execute(
+        """
+        INSERT INTO operation_logs (id, case_id, action, node_id, description, created_at)
+        VALUES (?, ?, 'archive', ?, ?, ?)
+        """,
+        (
+            unique_id("log-folder-remove"),
+            case_id,
+            folder_path,
+            f"Permanently deleted folder {folder_path} and its workspace-derived data.",
+            now,
+        ),
+    )
+    reset_case_head_pointers(conn, case_id, now)
+    rebuild_case_captable_versions(conn, case_id)
+
+
+def delete_case_records(conn: sqlite3.Connection, case_id: str) -> None:
+    conn.execute("DELETE FROM case_messages WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM operation_logs WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM topology_refs WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM captable_versions WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM topology_nodes WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM equity_events WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM document_facts WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM structured_results WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM files WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+
+
+def delete_ids(
+    conn: sqlite3.Connection,
+    table: str,
+    field: str,
+    case_id: str,
+    values: list[str],
+) -> None:
+    if not values:
+        return
+    placeholders = ",".join("?" for _ in values)
+    conn.execute(f"DELETE FROM {table} WHERE case_id = ? AND {field} IN ({placeholders})", (case_id, *values))
+
+
+def delete_operation_logs_for_nodes(conn: sqlite3.Connection, case_id: str, node_ids: list[str]) -> None:
+    if not node_ids:
+        return
+    placeholders = ",".join("?" for _ in node_ids)
+    conn.execute(f"DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({placeholders})", (case_id, *node_ids))
+
+
+def delete_refs_for_nodes(conn: sqlite3.Connection, case_id: str, node_ids: list[str]) -> None:
+    if not node_ids:
+        return
+    placeholders = ",".join("?" for _ in node_ids)
+    conn.execute(
+        f"DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({placeholders}) OR to_node_id IN ({placeholders}))",
+        (case_id, *node_ids, *node_ids),
+    )
+
+
+def count_rows(conn: sqlite3.Connection, table: str, case_id: str) -> int:
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {table} WHERE case_id = ?", (case_id,)).fetchone()
+    return int(row["count"])
+
+
+def count_ids(conn: sqlite3.Connection, table: str, field: str, case_id: str, values: list[str]) -> int:
+    if not values:
+        return 0
+    placeholders = ",".join("?" for _ in values)
+    row = conn.execute(
+        f"SELECT COUNT(*) AS count FROM {table} WHERE case_id = ? AND {field} IN ({placeholders})",
+        (case_id, *values),
+    ).fetchone()
+    return int(row["count"])
+
+
+def remove_folder(case_id: str, folder_path: str) -> dict[str, Any]:
+    normalized_folder = normalize_folder_path(folder_path)
+    if not normalized_folder:
+        raise ValueError("Folder path is required")
+    return perform_case_deletion(case_id, "folder", normalized_folder)
+
+
+def delete_case(case_id: str) -> dict[str, Any]:
+    return perform_case_deletion(case_id, "case", case_id)
+
+
 def list_case_messages(case_id: str = DEFAULT_CASE_ID) -> list[dict[str, Any]]:
-    create_case(case_id, "Default financing audit")
+    create_case(case_id, DEFAULT_CASE_NAME)
     with connect() as conn:
         rows = conn.execute(
             "SELECT * FROM case_messages WHERE case_id = ? ORDER BY created_at, rowid",
@@ -587,7 +1271,7 @@ def list_case_messages(case_id: str = DEFAULT_CASE_ID) -> list[dict[str, Any]]:
 
 
 def append_case_message(case_id: str, role: str, content: str) -> dict[str, Any]:
-    create_case(case_id, "Default financing audit")
+    create_case(case_id, DEFAULT_CASE_NAME)
     message = {
         "id": unique_id("msg"),
         "role": role,
@@ -606,7 +1290,11 @@ def append_case_message(case_id: str, role: str, content: str) -> dict[str, Any]
 
 
 def get_node_detail(node_id: str) -> dict[str, Any]:
-    snapshot = build_workbench_snapshot(DEFAULT_CASE_ID)
+    with connect() as conn:
+        node_row = get_node(conn, node_id)
+    if not node_row:
+        raise KeyError(node_id)
+    snapshot = build_workbench_snapshot(node_row["case_id"])
     node = next((item for item in snapshot["topology"]["nodes"] if item["id"] == node_id), None)
     if not node:
         raise KeyError(node_id)
@@ -712,29 +1400,21 @@ def infer_security_type(title: str) -> str:
 
 
 def write_captable_rows(conn: sqlite3.Connection, case_id: str, version_id: str, document_ids: list[str]) -> None:
-    rows: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str, str, float]] = set()
-    for document_id in document_ids:
-        file_row = conn.execute("SELECT * FROM files WHERE id = ?", (document_id,)).fetchone()
-        result_row = conn.execute("SELECT raw_json FROM structured_results WHERE document_id = ?", (document_id,)).fetchone()
-        raw = json.loads(result_row["raw_json"]) if result_row else {}
-        title = file_row["file_name"] if file_row else document_id
-        for row in extract_captable_rows(raw, title, document_id):
-            key = (row["holder"], row["security"], row["location"], row["shares"])
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            rows.append(row)
-
-    total = sum(row["shares"] for row in rows)
+    rows = build_captable_rows_from_events(conn, case_id, document_ids)
+    view_totals = {
+        view_type: sum(item["shares"] for item in rows if item["view_type"] == view_type)
+        for view_type in {item["view_type"] for item in rows}
+    }
     for row in rows:
-        ownership = round((row["shares"] / total) * 100, 2) if total else 0
+        denominator = view_totals.get(row["view_type"], 0)
+        ownership = round((row["shares"] / denominator) * 100, 2) if denominator else 0
         conn.execute(
             """
             INSERT INTO captable_rows
             (id, version_id, holder_name, security_type, shares, ownership_percentage,
-             source_document_id, source_location)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             source_document_id, source_location, event_ids_json, evidence_ids_json, confidence, review_status,
+             view_type, event_status, share_class, series)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 unique_id("row"),
@@ -745,6 +1425,14 @@ def write_captable_rows(conn: sqlite3.Connection, case_id: str, version_id: str,
                 ownership,
                 row["document_id"],
                 row["location"],
+                json.dumps(row["event_ids"], ensure_ascii=False),
+                json.dumps(row["evidence_ids"], ensure_ascii=False),
+                row["confidence"],
+                row["review_status"],
+                row["view_type"],
+                row["status"],
+                row["share_class"],
+                row["series"],
             ),
         )
 
@@ -767,42 +1455,99 @@ def rebuild_generated_captables() -> None:
                 "SELECT COUNT(*) AS count FROM captable_rows WHERE version_id = ?",
                 (version["id"],),
             ).fetchone()["count"]
+            projection_count = conn.execute(
+                "SELECT COUNT(DISTINCT view_type) AS count FROM captable_rows WHERE version_id = ?",
+                (version["id"],),
+            ).fetchone()["count"]
             conn.execute(
                 "UPDATE captable_versions SET summary = ? WHERE id = ?",
-                (
-                    f"Generated from {len(document_ids)} document(s). "
-                    f"{row_count} material cap table row(s) were reconstructed from evidence.",
-                    version["id"],
-                ),
+                (captable_summary(len(document_ids), row_count, projection_count), version["id"]),
             )
 
 
-def extract_captable_rows(raw: dict[str, Any], title: str, document_id: str) -> list[dict[str, Any]]:
-    candidates = raw.get("raw_candidates", {}) if isinstance(raw.get("raw_candidates"), dict) else {}
-    share_candidates = candidates.get("share_counts", []) if isinstance(candidates.get("share_counts"), list) else []
-    rows: list[dict[str, Any]] = []
+def build_captable_rows_from_events(
+    conn: sqlite3.Connection,
+    case_id: str,
+    document_ids: list[str],
+) -> list[dict[str, Any]]:
+    if not document_ids:
+        return []
+    placeholders = ",".join("?" for _ in document_ids)
+    event_rows = list(
+        conn.execute(
+            f"""
+            SELECT * FROM equity_events
+            WHERE case_id = ?
+              AND document_id IN ({placeholders})
+              AND quantity > 0
+            ORDER BY effective_date, created_at, rowid
+            """,
+            (case_id, *document_ids),
+        )
+    )
+    aggregated: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for row in event_rows:
+        for view_type in projection_types_for_event(row):
+            status = row["status"] or "issued"
+            security = format_projection_security(row, view_type)
+            holder = str(row["holder_name"] or "Unknown holder")
+            key = (view_type, holder, security, status)
+            bucket = aggregated.get(key)
+            evidence_ids = json.loads(row["source_evidence_ids_json"]) if row["source_evidence_ids_json"] else []
+            if bucket is None:
+                aggregated[key] = {
+                    "holder": holder,
+                    "security": security,
+                    "shares": float(row["quantity"]),
+                    "document_id": row["document_id"],
+                    "location": build_event_location(row),
+                    "event_ids": [row["id"]],
+                    "evidence_ids": evidence_ids,
+                    "confidence": float(row["confidence"] or 0.0),
+                    "review_status": row["review_status"] or "needs_review",
+                    "status": status,
+                    "view_type": view_type,
+                    "share_class": str(row["share_class"] or ""),
+                    "series": str(row["series"] or ""),
+                }
+            else:
+                bucket["shares"] += float(row["quantity"])
+                bucket["event_ids"].append(row["id"])
+                bucket["evidence_ids"] = dedupe_str_list([*bucket["evidence_ids"], *evidence_ids])
+                bucket["confidence"] = round((bucket["confidence"] + float(row["confidence"] or 0.0)) / 2, 2)
+                if bucket["review_status"] != row["review_status"]:
+                    bucket["review_status"] = "needs_review"
+    return [row for row in aggregated.values() if row["shares"] > 0]
 
-    for candidate in share_candidates:
-        if not isinstance(candidate, dict):
-            continue
-        source_text = str(candidate.get("source_text") or "")
-        paragraph_id = candidate.get("paragraph_id", "unknown")
-        location = f"paragraph {paragraph_id}"
-        text = clean_capitalization_text(source_text)
 
-        rows.extend(extract_common_outstanding_rows(text, document_id, location))
-        rows.extend(extract_preferred_outstanding_rows(text, document_id, location))
-        rows.extend(extract_stock_plan_rows(text, document_id, location))
-        rows.extend(extract_minimum_closing_rows(text, document_id, location))
-
-    if rows:
-        return dedupe_captable_rows(rows)
-
-    return extract_llm_share_rows(raw, title, document_id)
+def projection_types_for_event(row: sqlite3.Row) -> list[str]:
+    status = str(row["status"] or "issued")
+    if status == "reserved":
+        return ["reserved_pool", "fully_diluted"]
+    if status in {"issued", "outstanding"}:
+        return ["issued_outstanding", "fully_diluted"]
+    if status == "approved":
+        return ["fully_diluted"]
+    return ["fully_diluted"]
 
 
-def extract_common_outstanding_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
-    rows = []
+def format_projection_security(row: sqlite3.Row, view_type: str) -> str:
+    security = str(row["security_type"] or "Unknown Security")
+    if view_type == "reserved_pool":
+        if str(row["share_class"] or "") == "Options":
+            return f"{security} Reserved"
+        return f"{security} Pool"
+    return security
+
+
+def extract_common_outstanding_events(
+    text: str,
+    file_type: str,
+    location: str,
+    fact_ids: list[str],
+    result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    events = []
     match = re.search(
         r"(?P<authorized>\d[\d,]*)\s+shares\s+of\s+common\s+stock.*?"
         r"(?P<outstanding>\d[\d,]*)\s+shares\s+of\s+which\s+are\s+issued\s+and\s+outstanding",
@@ -810,20 +1555,34 @@ def extract_common_outstanding_rows(text: str, document_id: str, location: str) 
         flags=re.IGNORECASE,
     )
     if match:
-        rows.append(
-            captable_row(
-                "Existing common stockholders",
-                "Common Stock",
-                match.group("outstanding"),
-                document_id,
-                location,
+        events.append(
+            equity_event(
+                event_type=infer_event_type(file_type),
+                effective_date=infer_transaction_date(result),
+                holder_name="Existing common stockholders",
+                security_type="Common Stock",
+                share_class="Common Stock",
+                series="",
+                quantity=parse_number(match.group("outstanding")),
+                unit_price=None,
+                amount=None,
+                status="outstanding",
+                source_evidence_ids=fact_ids,
+                confidence=0.82,
+                review_status="needs_review",
             )
         )
-    return rows
+    return events
 
 
-def extract_preferred_outstanding_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
-    rows = []
+def extract_preferred_outstanding_events(
+    text: str,
+    file_type: str,
+    location: str,
+    fact_ids: list[str],
+    result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    events = []
     pattern = re.compile(
         r"(?P<shares>\d[\d,]*)\s+shares\s+have\s+been\s+designated\s+"
         r"(?P<series>Series\s+[A-Za-z0-9-]+\s+Preferred\s+Stock),\s+"
@@ -834,22 +1593,66 @@ def extract_preferred_outstanding_rows(text: str, document_id: str, location: st
         if match.group("status").lower() != "all":
             continue
         series = normalize_security_name(match.group("series"))
-        rows.append(captable_row(f"Existing {series} holders", series, match.group("shares"), document_id, location))
-    return rows
+        events.append(
+            equity_event(
+                event_type=infer_event_type(file_type),
+                effective_date=infer_transaction_date(result),
+                holder_name=f"Existing {series} holders",
+                security_type=series,
+                share_class="Preferred Stock",
+                series=series,
+                quantity=parse_number(match.group("shares")),
+                unit_price=None,
+                amount=None,
+                status="outstanding",
+                source_evidence_ids=fact_ids,
+                confidence=0.84,
+                review_status="needs_review",
+            )
+        )
+    return events
 
 
-def extract_stock_plan_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
+def extract_stock_plan_events(
+    text: str,
+    file_type: str,
+    location: str,
+    fact_ids: list[str],
+    result: dict[str, Any],
+) -> list[dict[str, Any]]:
     if "stock plan" not in text.lower():
         return []
 
-    rows = []
+    events = []
     options_match = re.search(
         r"options\s+to\s+purchase\s+(?P<shares>\d[\d,]*)\s+shares\s+have\s+been\s+granted\s+and\s+are\s+currently\s+outstanding",
         text,
         flags=re.IGNORECASE,
     )
     if options_match:
-        rows.append(captable_row("Optionholders", "Common Stock Options", options_match.group("shares"), document_id, location))
+        events.append(
+            equity_event(
+                event_type="option_grant",
+                effective_date=infer_transaction_date(result),
+                holder_name="Optionholders",
+                security_type="Common Stock Options",
+                share_class="Options",
+                series="",
+                quantity=parse_number(options_match.group("shares")),
+                unit_price=None,
+                amount=None,
+                status=normalize_event_status(
+                    file_type=file_type,
+                    event_type="option_grant",
+                    share_class="Options",
+                    context="options_outstanding_clause",
+                    source_text=text,
+                ),
+                source_evidence_ids=fact_ids,
+                confidence=0.8,
+                review_status="needs_review",
+            )
+        )
 
     available_match = re.search(
         r"(?P<shares>\d[\d,]*)\s+shares\s+of\s+Common\s+Stock\s+remain\s+available\s+for\s+issuance",
@@ -857,14 +1660,40 @@ def extract_stock_plan_rows(text: str, document_id: str, location: str) -> list[
         flags=re.IGNORECASE,
     )
     if available_match:
-        rows.append(
-            captable_row("Unallocated option pool", "Common Stock Reserved", available_match.group("shares"), document_id, location)
+        events.append(
+            equity_event(
+                event_type="option_pool_increase",
+                effective_date=infer_transaction_date(result),
+                holder_name="Unallocated option pool",
+                security_type="Common Stock",
+                share_class="Common Stock",
+                series="",
+                quantity=parse_number(available_match.group("shares")),
+                unit_price=None,
+                amount=None,
+                status=normalize_event_status(
+                    file_type=file_type,
+                    event_type="option_pool_increase",
+                    share_class="Options",
+                    context="available_for_issuance_clause",
+                    source_text=text,
+                ),
+                source_evidence_ids=fact_ids,
+                confidence=0.8,
+                review_status="needs_review",
+            )
         )
 
-    return rows
+    return events
 
 
-def extract_minimum_closing_rows(text: str, document_id: str, location: str) -> list[dict[str, Any]]:
+def extract_minimum_closing_events(
+    text: str,
+    file_type: str,
+    location: str,
+    fact_ids: list[str],
+    result: dict[str, Any],
+) -> list[dict[str, Any]]:
     match = re.search(
         r"minimum\s+of\s+(?P<shares>\d[\d,]*)\s+Shares\s+must\s+be\s+sold\s+at\s+the\s+Initial\s+Closing",
         text,
@@ -873,58 +1702,47 @@ def extract_minimum_closing_rows(text: str, document_id: str, location: str) -> 
     if not match:
         return []
     return [
-        captable_row(
-            "Series A purchasers (minimum closing)",
-            "Series A Preferred Stock",
-            match.group("shares"),
-            document_id,
-            location,
+        equity_event(
+            event_type="preferred_financing",
+            effective_date=infer_transaction_date(result),
+            holder_name="Series A purchasers (minimum closing)",
+            security_type="Series A Preferred Stock",
+            share_class="Preferred Stock",
+            series="Series A",
+            quantity=parse_number(match.group("shares")),
+            unit_price=None,
+            amount=None,
+            status=normalize_event_status(
+                file_type=file_type,
+                event_type="preferred_financing",
+                share_class="Preferred Stock",
+                context="minimum_closing",
+                source_text=text,
+            ),
+            source_evidence_ids=fact_ids,
+            confidence=0.76,
+            review_status="needs_review",
         )
     ]
 
 
-def extract_llm_share_rows(raw: dict[str, Any], title: str, document_id: str) -> list[dict[str, Any]]:
-    financing_terms = raw.get("financing_terms", {}) if isinstance(raw.get("financing_terms"), dict) else {}
-    share_amounts = financing_terms.get("share_amounts", [])
-    if not isinstance(share_amounts, list):
-        return []
-
-    rows = []
-    for index, value in enumerate(share_amounts[:10], start=1):
-        shares = parse_number(json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else str(value))
-        if shares < MIN_CAPTABLE_SHARE_COUNT:
-            continue
-        holder = extract_named_value(value, ["holder", "purchaser", "stockholder", "party"]) or f"Extracted holder {index}"
-        security = extract_named_value(value, ["security", "security_class", "class", "series"]) or infer_security_type(title)
-        source = extract_named_value(value, ["source", "sourceLocation", "source_location"]) or "LLM financing terms"
-        rows.append(captable_row(holder, security, shares, document_id, source))
-    return dedupe_captable_rows(rows)
-
-
-def captable_row(holder: str, security: str, shares: str | float, document_id: str, location: str) -> dict[str, Any]:
-    parsed_shares = parse_number(str(shares))
-    if parsed_shares < MIN_CAPTABLE_SHARE_COUNT:
-        parsed_shares = 0
-    return {
-        "holder": holder,
-        "security": security,
-        "shares": parsed_shares,
-        "document_id": document_id,
-        "location": location,
-    }
-
-
-def dedupe_captable_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def dedupe_equity_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     deduped = []
-    seen: set[tuple[str, str, float]] = set()
-    for row in rows:
-        if row["shares"] <= 0:
+    seen: set[tuple[str, str, str, float, str]] = set()
+    for event in events:
+        if event["quantity"] <= 0:
             continue
-        key = (row["holder"].lower(), row["security"].lower(), row["shares"])
+        key = (
+            event["holder_name"].lower(),
+            event["security_type"].lower(),
+            event["event_type"].lower(),
+            event["quantity"],
+            event["status"].lower(),
+        )
         if key in seen:
             continue
         seen.add(key)
-        deduped.append(row)
+        deduped.append(event)
     return deduped
 
 
@@ -934,6 +1752,151 @@ def clean_capitalization_text(value: str) -> str:
 
 def normalize_security_name(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().replace("seed", "Seed")
+
+
+def infer_event_type(file_type: str) -> str:
+    if file_type == "board_resolution":
+        return "board_approval"
+    if file_type == "draft_transaction":
+        return "proposed_financing"
+    if file_type == "side_letter":
+        return "side_letter_adjustment"
+    return "stock_issuance"
+
+
+def infer_event_status(file_type: str, context: Any = None) -> str:
+    if file_type == "draft_transaction":
+        return "proposed"
+    if context == "minimum_closing":
+        return "approved"
+    return "issued"
+
+
+def normalize_holder_event_type(security_type: str, share_class: str) -> str:
+    normalized = f"{security_type} {share_class}".lower()
+    if "option" in normalized:
+        return "option_grant"
+    if "preferred" in normalized or "series" in normalized:
+        return "preferred_financing"
+    return "stock_issuance"
+
+
+def normalize_event_status(
+    *,
+    file_type: str,
+    event_type: str,
+    share_class: str,
+    context: str | None,
+    source_text: str | None,
+    status_hint: str | None = None,
+) -> str:
+    normalized_hint = (status_hint or "").strip().lower()
+    if normalized_hint in {"issued", "outstanding", "reserved", "proposed", "approved"}:
+        return normalized_hint
+
+    text = (source_text or "").lower()
+    share_class_text = (share_class or "").lower()
+
+    if file_type == "draft_transaction":
+        if event_type == "option_pool_increase":
+            return "proposed"
+        return "proposed"
+
+    if context in {"available_for_issuance_clause", "option_pool_increase"}:
+        return "reserved"
+
+    if event_type == "option_pool_increase":
+        if "remain available" in text or "reserved" in text or "available for issuance" in text:
+            return "reserved"
+        if file_type == "board_resolution":
+            return "approved"
+        return "reserved"
+
+    if "issued and outstanding" in text or "currently outstanding" in text:
+        return "outstanding"
+
+    if context == "minimum_closing":
+        return "approved"
+
+    if event_type == "preferred_financing":
+        if "must be sold" in text or "minimum closing" in text:
+            return "approved"
+        if file_type == "board_resolution":
+            return "approved"
+        return "issued"
+
+    if event_type == "option_grant":
+        if "granted and are currently outstanding" in text or "outstanding option" in text:
+            return "outstanding"
+        if file_type == "board_resolution":
+            return "approved"
+        return "issued"
+
+    if file_type == "board_resolution":
+        if "authorized" in text or "approved" in text:
+            return "approved"
+        if "reserved" in text and "option" in share_class_text:
+            return "reserved"
+        return "approved"
+
+    return infer_event_status(file_type, context)
+
+
+def describe_event_status(status: str) -> str:
+    meanings = {
+        "issued": "Issued based on extracted transaction or holder evidence, but not explicitly stated as currently outstanding.",
+        "outstanding": "Explicitly described as currently issued and outstanding in the source evidence.",
+        "reserved": "Reserved for future issuance and excluded from issued/outstanding counts.",
+        "proposed": "Appears in draft or preliminary transaction language and should not be treated as executed issuance.",
+        "approved": "Authorized or approved in source documents, but not yet confirmed as issued and outstanding.",
+    }
+    return meanings.get(status, "Derived from extracted event evidence and still requires legal review.")
+
+
+def extract_evidence_text(value: Any) -> str:
+    evidence = value if isinstance(value, list) else []
+    if evidence and isinstance(evidence[0], dict):
+        return str(evidence[0].get("source_text") or "")
+    return ""
+
+
+def parse_optional_number(value: Any) -> float | None:
+    if value in (None, "", [], {}):
+        return None
+    parsed = parse_number(json.dumps(value, ensure_ascii=False) if isinstance(value, dict) else str(value))
+    return parsed if parsed > 0 else None
+
+
+def infer_series(security: str) -> str:
+    match = re.search(r"(Series\s+[A-Za-z0-9-]+)", security, flags=re.IGNORECASE)
+    return normalize_security_name(match.group(1)) if match else ""
+
+
+def evidence_to_source(evidence: list[dict[str, Any]]) -> tuple[str, str]:
+    if evidence:
+        first = evidence[0]
+        return (
+            f"paragraph {first.get('paragraph_id', 'unknown')}",
+            str(first.get("source_text") or ""),
+        )
+    return ("document", "")
+
+
+def dedupe_str_list(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
+
+
+def build_event_location(row: sqlite3.Row) -> str:
+    if row["effective_date"]:
+        return f"{row['status']} @ {row['effective_date']}"
+    return row["status"]
 
 
 def extract_named_value(value: Any, keys: list[str]) -> str | None:
@@ -1102,11 +2065,6 @@ def rebuild_case_captable_versions(conn: sqlite3.Connection, case_id: str) -> No
                 include_document_id = parent["entity_id"]
 
         document_ids = generated_document_ids(conn, case_id, include_document_id)
-        summary = (
-            f"Generated from {len(document_ids)} document(s). Rows are evidence-backed demo calculations."
-            if document_ids
-            else "Generated from 0 document(s). Rows are evidence-backed demo calculations."
-        )
         conn.execute(
             """
             UPDATE captable_versions
@@ -1117,12 +2075,24 @@ def rebuild_case_captable_versions(conn: sqlite3.Connection, case_id: str) -> No
                 cap_rows[index - 1]["id"] if index > 0 else None,
                 json.dumps(document_ids, ensure_ascii=False),
                 status,
-                summary,
+                captable_summary(len(document_ids), 0, 0),
                 row["id"],
             ),
         )
         conn.execute("DELETE FROM captable_rows WHERE version_id = ?", (row["id"],))
         write_captable_rows(conn, case_id, row["id"], document_ids)
+        row_count = conn.execute(
+            "SELECT COUNT(*) AS count FROM captable_rows WHERE version_id = ?",
+            (row["id"],),
+        ).fetchone()["count"]
+        projection_count = conn.execute(
+            "SELECT COUNT(DISTINCT view_type) AS count FROM captable_rows WHERE version_id = ?",
+            (row["id"],),
+        ).fetchone()["count"]
+        conn.execute(
+            "UPDATE captable_versions SET summary = ? WHERE id = ?",
+            (captable_summary(len(document_ids), row_count, projection_count), row["id"]),
+        )
 
 
 def artifact_stem_for_source_path(source_path: str) -> str:
@@ -1131,19 +2101,43 @@ def artifact_stem_for_source_path(source_path: str) -> str:
     return stem.strip("_") or "document"
 
 
-def remove_document_artifacts(source_paths: set[str]) -> None:
-    for source_path in source_paths:
-        source = Path(source_path)
-        artifact_stem = artifact_stem_for_source_path(source_path)
-        candidates = DEFAULT_OUTPUT_DIR / "candidates" / f"{artifact_stem}.candidates.json"
-        parsed = DEFAULT_OUTPUT_DIR / "parsed" / f"{artifact_stem}.parsed.json"
-        output_json = DEFAULT_OUTPUT_DIR / f"{artifact_stem}.json"
-        for path in (source, candidates, parsed, output_json):
+def document_artifact_paths(source_path: str) -> list[Path]:
+    source = Path(source_path)
+    artifact_stem = artifact_stem_for_source_path(source_path)
+    return [
+        source,
+        DEFAULT_OUTPUT_DIR / "candidates" / f"{artifact_stem}.candidates.json",
+        DEFAULT_OUTPUT_DIR / "parsed" / f"{artifact_stem}.parsed.json",
+        DEFAULT_OUTPUT_DIR / f"{artifact_stem}.json",
+    ]
+
+
+def document_artifact_paths_from_rows(file_rows: list[sqlite3.Row]) -> set[Path]:
+    paths: set[Path] = set()
+    for row in file_rows:
+        raw_artifacts = row["artifact_paths_json"] if "artifact_paths_json" in row.keys() else None
+        if raw_artifacts:
             try:
-                if path.exists():
-                    path.unlink()
-            except OSError:
+                for item in json.loads(raw_artifacts):
+                    if item:
+                        paths.add(Path(str(item)))
                 continue
+            except json.JSONDecodeError:
+                pass
+        for path in document_artifact_paths(row["source_path"]):
+            paths.add(path)
+    return paths
+
+
+def remove_document_artifacts(paths: set[Path]) -> list[str]:
+    errors: list[str] = []
+    for path in sorted(paths):
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError as exc:
+            errors.append(f"{path}: {exc}")
+    return errors
 
 
 def parse_number(value: str) -> float:
@@ -1214,7 +2208,13 @@ def infer_transaction_type(result: dict[str, Any], file_type: str) -> str:
 def build_impact_summary(result: dict[str, Any], file_type: str) -> str:
     counts = result.get("candidate_group_counts", {})
     share_count = len(result.get("raw_candidates", {}).get("share_counts", []))
-    return f"{file_type.replace('_', ' ')} produced {share_count} share candidate(s) and {sum(counts.values()) if isinstance(counts, dict) else 0} review paragraph(s)."
+    event_count = len(result.get("transaction_facts", [])) if isinstance(result.get("transaction_facts"), list) else 0
+    holder_count = len(result.get("holder_facts", [])) if isinstance(result.get("holder_facts"), list) else 0
+    return (
+        f"{file_type.replace('_', ' ')} produced {share_count} share candidate(s), "
+        f"{event_count} transaction fact(s), and {holder_count} holder fact(s) "
+        f"from {sum(counts.values()) if isinstance(counts, dict) else 0} review paragraph(s)."
+    )
 
 
 def build_extracted_terms(result: dict[str, Any]) -> list[dict[str, str]]:
@@ -1229,6 +2229,26 @@ def build_extracted_terms(result: dict[str, Any]) -> list[dict[str, str]]:
                     "sourceLocation": f"paragraph {item.get('paragraph_id', 'unknown')}",
                 }
             )
+    for fact in result.get("holder_facts", [])[:5] if isinstance(result.get("holder_facts"), list) else []:
+        if not isinstance(fact, dict):
+            continue
+        terms.append(
+            {
+                "name": "Holder fact",
+                "value": str(fact.get("holder_name") or fact.get("share_count") or ""),
+                "sourceLocation": evidence_to_source(fact.get("evidence") if isinstance(fact.get("evidence"), list) else [])[0],
+            }
+        )
+    for fact in result.get("transaction_facts", [])[:5] if isinstance(result.get("transaction_facts"), list) else []:
+        if not isinstance(fact, dict):
+            continue
+        terms.append(
+            {
+                "name": "Transaction fact",
+                "value": str(fact.get("event_type") or fact.get("quantity") or ""),
+                "sourceLocation": evidence_to_source(fact.get("evidence") if isinstance(fact.get("evidence"), list) else [])[0],
+            }
+        )
     return terms[:12]
 
 
@@ -1325,9 +2345,19 @@ def captable_payload(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, An
             "ownershipPercentage": item["ownership_percentage"],
             "sourceDocumentId": item["source_document_id"],
             "sourceLocation": item["source_location"],
+            "eventIds": json.loads(item["event_ids_json"]) if item["event_ids_json"] else [],
+            "evidenceIds": json.loads(item["evidence_ids_json"]) if item["evidence_ids_json"] else [],
+            "confidence": item["confidence"] if item["confidence"] is not None else 0.0,
+            "reviewStatus": item["review_status"] or "needs_review",
+            "viewType": item["view_type"] or "issued_outstanding",
+            "eventStatus": item["event_status"] or "issued",
+            "statusMeaning": describe_event_status(item["event_status"] or "issued"),
+            "shareClass": item["share_class"] or "",
+            "series": item["series"] or "",
         }
         for item in conn.execute("SELECT * FROM captable_rows WHERE version_id = ? ORDER BY rowid", (row["id"],))
     ]
+    projections = sorted({item["viewType"] for item in rows})
     return {
         "id": row["id"],
         "topologyNodeId": row["topology_node_id"],
@@ -1337,6 +2367,7 @@ def captable_payload(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, An
         "status": row["status"],
         "summary": row["summary"],
         "rows": rows,
+        "projections": projections,
         "createdAt": row["created_at"],
     }
 

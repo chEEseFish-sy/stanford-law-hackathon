@@ -99,6 +99,7 @@ export interface CapTableVersion {
   generatedFromDocumentIds: string[];
   status: CapTableStatus;
   summary: string;
+  projections: string[];
   rows: Array<{
     holderName: string;
     securityType: string;
@@ -106,6 +107,15 @@ export interface CapTableVersion {
     ownershipPercentage: number;
     sourceDocumentId: string;
     sourceLocation: string;
+    eventIds: string[];
+    evidenceIds: string[];
+    confidence: number;
+    reviewStatus: string;
+    viewType: string;
+    eventStatus: string;
+    statusMeaning: string;
+    shareClass: string;
+    series: string;
   }>;
   createdAt: string;
 }
@@ -191,4 +201,63 @@ export interface WorkbenchSnapshot {
   chatMessages: ChatMessage[];
   documentPreviews: DocumentPreview[];
   documentComparisons: DocumentComparison[];
+}
+
+export interface DeletionResponse {
+  scopeType: "folder" | "case";
+  scopeRef: string;
+  removedCounts: {
+    files: number;
+    structuredResults: number;
+    captableVersions: number;
+    messages: number;
+  };
+  deletionEventId: string;
+  workbench: WorkbenchSnapshot | null;
+}
+
+export interface LlmSessionConfig {
+  apiKey: string;
+  modelName: string;
+}
+
+export type WorkspaceEntryState =
+  | "ready"
+  | "backend_unreachable"
+  | "loading"
+  | "demo_available"
+  | "workspace_empty"
+  | "llm_not_configured";
+
+export type ApiErrorCategory =
+  | "network_unreachable"
+  | "server_error"
+  | "validation_error"
+  | "not_found"
+  | "unknown";
+
+export interface ApiFailure {
+  category: ApiErrorCategory;
+  message: string;
+  statusCode?: number;
+  detail?: string;
+}
+
+export interface SystemStatus {
+  api: {
+    status: "ok";
+  };
+  workspace: {
+    defaultCaseId: string;
+    defaultCaseAvailable: boolean;
+    defaultCaseName: string;
+  };
+  llm: {
+    configured: boolean;
+    modelName: string;
+  };
+  mode: {
+    demoDataAvailable: boolean;
+    storage: "local";
+  };
 }

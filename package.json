@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "dev": "node ./scripts/dev.mjs",
+    "dev:backend": "python3 -m uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
   "dependencies": {
     "pptxgenjs": "^4.0.1"
   }

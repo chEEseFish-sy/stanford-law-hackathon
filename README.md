@@ -9,7 +9,7 @@ VeriCap 是一个面向创业公司融资尽调场景的 AI 辅助 cap table 审
 - DOCX 处理流水线
 - SQLite 工作台存储
 - 样例数据与已处理结果
-- 通过 `LLM_API_KEY` 启用的可选 LLM 抽取能力
+- 通过应用内输入的 DeepSeek API key 或后端环境变量启用的可选 LLM 抽取能力
 
 ## VeriCap 做什么
 
@@ -50,7 +50,8 @@ VeriCap 是审计辅助工具，不提供最终法律结论，也不能替代律
 
 可选：
 
-- 如果需要启用 LLM 抽取，请准备可用的 `LLM_API_KEY`。如果未配置，系统会回退到本地规则抽取和演示数据。
+- 如果需要启用 LLM 抽取，请准备可用的 DeepSeek API key。推荐在应用内 `Workspace Settings` 中输入；如果未配置，系统会回退到本地规则抽取和演示数据。
+- 完成一次性安装后，推荐直接在仓库根目录运行 `npm run dev`，它会自动先启动后端，再拉起前端。
 
 ## 环境变量
 
@@ -58,15 +59,16 @@ VeriCap 是审计辅助工具，不提供最终法律结论，也不能替代律
 
 ```bash
 VITE_API_BASE_URL=http://127.0.0.1:8000
-LLM_API_KEY=your_api_key_here
-LLM_MODEL_NAME=gemini-3-flash-preview
+DEEPSEEK_API_KEY=your_api_key_here
+DEEPSEEK_MODEL_NAME=deepseek-chat
 ```
 
 - 前端会从主目录 `.env` 读取 `VITE_API_BASE_URL`。
-- 后端会从主目录 `.env` 读取 `LLM_API_KEY` 和 `LLM_MODEL_NAME`。
-- 如果没有提供 `LLM_API_KEY`，后端会在上传处理和聊天解释中回退到本地确定性逻辑。
+- 推荐在应用内 `Workspace Settings` 输入用户自己的 DeepSeek API key 和模型名；这些设置只保存在当前浏览器 session。
+- 后端仍可从主目录 `.env` 读取 `DEEPSEEK_API_KEY` 和 `DEEPSEEK_MODEL_NAME` 作为本地开发兜底。
+- 如果没有提供 API key，上传处理会回退到本地确定性逻辑，聊天解释则需要先在应用内补充 key。
 
-## 后端启动
+## 一次性安装
 
 在仓库根目录执行：
 
@@ -74,12 +76,44 @@ LLM_MODEL_NAME=gemini-3-flash-preview
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r backend/requirements.txt
+npm install
 ```
 
-启动 FastAPI 后端：
+安装前端依赖：
 
 ```bash
-uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000
+cd frontend
+npm install
+cd ..
+```
+
+## 推荐启动方式
+
+在仓库根目录执行：
+
+```bash
+npm run dev
+```
+
+这个命令会自动：
+
+- 启动 FastAPI 后端
+- 等待后端健康检查通过
+- 启动前端 Vite 开发服务器
+
+默认地址：
+
+```text
+前端: http://127.0.0.1:5173
+后端: http://127.0.0.1:8000
+```
+
+## 分开启动后端
+
+如果你仍然需要单独启动后端：
+
+```bash
+npm run dev:backend
 ```
 
 健康检查：
@@ -94,14 +128,12 @@ curl http://127.0.0.1:8000/api/health
 {"status":"ok"}
 ```
 
-## 前端启动
+## 分开启动前端
 
 打开第二个终端并执行：
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev:frontend
 ```
 
 Vite 默认通常运行在：
@@ -118,8 +150,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## 如何使用
 
-1. 启动后端。
-2. 启动前端。
+1. 运行 `npm run dev`。
 3. 在浏览器打开 Vite 地址。
 4. 进入工作台页面。
 5. 在左侧或文件区域上传一个或多个融资文件。
@@ -174,11 +205,7 @@ POST /api/cases/{case_id}/viewing-version
 POST /api/process
 ```
 
-默认 case ID 为：
-
-```text
-case-default
-```
+前端工作台现在会为每个浏览器 session 生成独立 `case_id`，不再依赖固定的 `case-default`。
 
 ## 常用开发命令
 
@@ -195,7 +222,7 @@ npm run preview
 后端：
 
 ```bash
-uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000
+npm run dev:backend
 python3 backend/process_docx_data.py --input data --output storage
 ```
 
@@ -205,6 +232,14 @@ python3 backend/process_docx_data.py --input data --output storage
 - 结构化抽取结果保存在 `storage/`。
 - SQLite 工作台数据库位于 `storage/vericap.sqlite3`。
 - 如果后端不可用，前端会回退到内置演示数据。
+- 用户上传文件的运行时产物位于 `storage/uploads/`、`storage/parsed/`、`storage/candidates/` 和 `storage/*.json`，这些目录应与样例 `data/` 分离管理。
+
+## 删除与保留
+
+- 当前工作台删除采用硬删除。
+- 文件夹级删除会永久删除该文件夹下的上传原件、结构化结果、working cap table 派生数据和当前 case 聊天上下文。
+- case 级删除会永久删除整个工作台的数据库记录与相关运行时文件。
+- 删除审计只保留最小元数据，例如删除范围、删除数量、时间和状态，不保留被删文件正文或聊天正文。
 
 ## 当前限制
 
