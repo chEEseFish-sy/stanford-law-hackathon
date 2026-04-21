@@ -239,9 +239,10 @@ function DocxPageReader({
 }
 
 export function Dashboard() {
-  const { snapshot, chatMessages, chatSending, apiError, sendChatMessage, uploadFiles, removeFolder } =
+  const { snapshot, chatMessages, chatSending, apiError, sendChatMessage, uploadFiles, removeFolder, deleteCase } =
     useWorkbench();
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
+  const workspaceName = snapshot?.workspace.caseName ?? "Workspace";
 
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
@@ -254,6 +255,10 @@ export function Dashboard() {
   const [folderPendingRemoval, setFolderPendingRemoval] = useState<DocumentFolderGroup | null>(null);
   const [isRemovingFolder, setIsRemovingFolder] = useState(false);
   const [folderRemovalError, setFolderRemovalError] = useState<string | null>(null);
+  const [isCaseDeleteDialogOpen, setIsCaseDeleteDialogOpen] = useState(false);
+  const [caseDeleteConfirmText, setCaseDeleteConfirmText] = useState("");
+  const [caseDeleteError, setCaseDeleteError] = useState<string | null>(null);
+  const [isDeletingCase, setIsDeletingCase] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [wordPageCount, setWordPageCount] = useState(0);
   const [isWordRendererLoading, setIsWordRendererLoading] = useState(false);
@@ -518,6 +523,25 @@ export function Dashboard() {
     }
   }, [folderPendingRemoval, removeFolder, selectedDocumentId]);
 
+  const handleConfirmDeleteCase = useCallback(async () => {
+    setIsDeletingCase(true);
+    setCaseDeleteError(null);
+
+    try {
+      await deleteCase(caseDeleteConfirmText);
+      setUploadedDocuments([]);
+      setSelectedDocumentId("");
+      setFolderPendingRemoval(null);
+      setCaseDeleteConfirmText("");
+      setIsCaseDeleteDialogOpen(false);
+      setUploadState(EMPTY_UPLOAD_STATE);
+    } catch (error) {
+      setCaseDeleteError(error instanceof Error ? error.message : "Failed to permanently delete workspace.");
+    } finally {
+      setIsDeletingCase(false);
+    }
+  }, [caseDeleteConfirmText, deleteCase]);
+
   const activeDocumentItem = documentItems.find((document) => document.id === selectedDocumentId) ?? null;
   const activeUploadedDocument = uploadedDocuments.find((document) => document.id === selectedDocumentId) ?? null;
   const activeServerDocument = documents.find((document) => document.id === selectedDocumentId) ?? null;
@@ -676,11 +700,18 @@ export function Dashboard() {
                       }
                     }}
                     className="flex-1 bg-transparent text-sm text-white/82 outline-none placeholder:text-white/34"
-                    placeholder={selectedDocumentId ? "Ask about the active document..." : "Select a document, then ask a question..."}
+                    disabled={!snapshot}
+                    placeholder={
+                      !snapshot
+                        ? "Upload documents to start a new workspace..."
+                        : selectedDocumentId
+                          ? "Ask about the active document..."
+                          : "Select a document, then ask a question..."
+                    }
                   />
                   <button
                     onClick={() => void handleSendMessage()}
-                    disabled={!chatInput.trim() || chatSending}
+                    disabled={!snapshot || !chatInput.trim() || chatSending}
                     className={cn(
                       "flex h-10 w-10 items-center justify-center rounded-full transition",
                       !chatInput.trim() || chatSending
@@ -762,9 +793,13 @@ export function Dashboard() {
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-orange-300/18 bg-orange-500/10 text-orange-200">
                       <FileText className="h-7 w-7" />
                     </div>
-                    <h2 className="mt-6 text-2xl font-semibold text-white">开始阅读一份文档</h2>
+                    <h2 className="mt-6 text-2xl font-semibold text-white">
+                      {snapshot ? "开始阅读一份文档" : "Workspace 已永久删除"}
+                    </h2>
                     <p className="mt-4 text-sm leading-7 text-white/58">
-                      从右侧 `Files` 选择一份文档，或先上传新的 DOCX 文档。进入后使用左右按钮切换分页。
+                      {snapshot
+                        ? "从右侧 `Files` 选择一份文档，或先上传新的 DOCX 文档。进入后使用左右按钮切换分页。"
+                        : "当前 case 的上传文件、结构化结果、工作台派生数据和聊天上下文已经被永久清理。你可以上传新的 DOCX 重新开始。"}
                     </p>
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                       <button
@@ -997,6 +1032,32 @@ export function Dashboard() {
                     ))}
                   </div>
                 ) : null}
+
+                {snapshot ? (
+                  <div className="mt-3 rounded-[18px] border border-rose-400/14 bg-rose-500/[0.08] px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-rose-200/70">Danger Zone</div>
+                      <div className="mt-2 text-sm font-semibold text-white">Delete Current Workspace</div>
+                      <div className="mt-2 text-xs leading-5 text-white/58">
+                        Permanently deletes uploaded files, structured results, cap table outputs, topology data, and chat
+                        history for {workspaceName}.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCaseDeleteError(null);
+                        setCaseDeleteConfirmText("");
+                        setIsCaseDeleteDialogOpen(true);
+                      }}
+                      className="flex shrink-0 items-center gap-2 rounded-full border border-rose-400/18 bg-rose-500/12 px-3 py-2 text-xs font-medium text-rose-100 transition hover:bg-rose-500/18 active:scale-[0.98]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="scrollbar-hidden flex-1 min-h-0 space-y-2 overflow-y-auto px-3 py-3">
@@ -1042,7 +1103,7 @@ export function Dashboard() {
                           className="flex shrink-0 items-center gap-2 rounded-full border border-rose-400/15 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/18 active:scale-[0.98]"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          Remove
+                          Delete
                         </button>
                       </div>
 
@@ -1122,9 +1183,10 @@ export function Dashboard() {
                   <Trash2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-lg font-semibold text-white">Remove Folder</div>
+                  <div className="text-lg font-semibold text-white">Permanently Delete Folder</div>
                   <div className="mt-2 text-sm leading-6 text-white/65">
-                    This removes all DOCX files in the selected folder from the current workspace.
+                    This permanently deletes uploaded DOCX files in the selected folder, their structured results, cap table
+                    outputs, and current case chat context.
                   </div>
                 </div>
               </div>
@@ -1133,7 +1195,7 @@ export function Dashboard() {
                 <div className="text-[11px] uppercase tracking-[0.18em] text-white/38">Folder</div>
                 <div className="mt-2 truncate text-sm font-medium text-white">{folderPendingRemoval.folderPath}</div>
                 <div className="mt-1 text-xs text-white/45">
-                  {folderPendingRemoval.documents.length} file{folderPendingRemoval.documents.length === 1 ? "" : "s"}
+                  {folderPendingRemoval.documents.length} file{folderPendingRemoval.documents.length === 1 ? "" : "s"} will be permanently deleted
                 </div>
               </div>
 
@@ -1165,7 +1227,82 @@ export function Dashboard() {
                       : "bg-rose-500/85 hover:bg-rose-500 active:scale-[0.98]",
                   )}
                 >
-                  {isRemovingFolder ? "Removing..." : "Remove Folder"}
+                  {isRemovingFolder ? "Deleting..." : "Permanently Delete"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+
+        {isCaseDeleteDialogOpen ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/76 px-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={PAGE_TRANSITION}
+              className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#111111]/95 p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/15 bg-rose-500/10 text-rose-200">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold text-white">Permanently Delete Workspace</div>
+                  <div className="mt-2 text-sm leading-6 text-white/65">
+                    This permanently deletes all uploaded files, structured results, cap table outputs, topology data, and chat
+                    history for this case.
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/38">Workspace</div>
+                <div className="mt-2 truncate text-sm font-medium text-white">{workspaceName}</div>
+                <div className="mt-3 text-xs text-white/45">Type `DELETE` to confirm permanent removal.</div>
+                <input
+                  value={caseDeleteConfirmText}
+                  onChange={(event) => setCaseDeleteConfirmText(event.target.value)}
+                  placeholder="DELETE"
+                  className="mt-3 w-full rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+                />
+              </div>
+
+              {caseDeleteError ? (
+                <div className="mt-4 rounded-[14px] border border-rose-400/15 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                  {caseDeleteError}
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    if (!isDeletingCase) {
+                      setIsCaseDeleteDialogOpen(false);
+                      setCaseDeleteError(null);
+                      setCaseDeleteConfirmText("");
+                    }
+                  }}
+                  className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/72 transition hover:bg-white/[0.08]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleConfirmDeleteCase()}
+                  disabled={isDeletingCase || caseDeleteConfirmText.trim().toUpperCase() !== "DELETE"}
+                  className={cn(
+                    "rounded-full px-4 py-2 text-sm font-medium text-white transition",
+                    isDeletingCase || caseDeleteConfirmText.trim().toUpperCase() !== "DELETE"
+                      ? "bg-rose-500/40 text-white/70"
+                      : "bg-rose-500/85 hover:bg-rose-500 active:scale-[0.98]",
+                  )}
+                >
+                  {isDeletingCase ? "Deleting..." : "Permanently Delete"}
                 </button>
               </div>
             </motion.div>

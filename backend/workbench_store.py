@@ -24,6 +24,9 @@ DEFAULT_OUTPUT_DIR = ROOT_DIR / "storage"
 DB_PATH = DEFAULT_OUTPUT_DIR / "vericap.sqlite3"
 MIN_CAPTABLE_SHARE_COUNT = 1_000
 ROOT_FOLDER_NAME = "Root"
+DELETION_STATUS_PENDING = "pending"
+DELETION_STATUS_COMPLETED = "completed"
+DELETION_STATUS_FAILED = "failed"
 
 
 def utc_now() -> str:
@@ -143,9 +146,25 @@ def init_store() -> None:
               content TEXT NOT NULL,
               created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS deletion_events (
+              id TEXT PRIMARY KEY,
+              scope_type TEXT NOT NULL,
+              case_id TEXT NOT NULL,
+              scope_ref TEXT NOT NULL,
+              removed_file_count INTEGER NOT NULL,
+              removed_structured_result_count INTEGER NOT NULL,
+              removed_captable_version_count INTEGER NOT NULL,
+              removed_message_count INTEGER NOT NULL,
+              status TEXT NOT NULL,
+              requested_at TEXT NOT NULL,
+              completed_at TEXT,
+              error_message TEXT
+            );
             """
         )
         ensure_column(conn, "files", "relative_path", "TEXT")
+        ensure_column(conn, "files", "artifact_paths_json", "TEXT")
 
     seed_if_empty()
     rebuild_generated_captables()
@@ -173,6 +192,12 @@ def create_case(case_id: str, name: str) -> None:
         )
 
 
+def case_exists(case_id: str) -> bool:
+    with connect() as conn:
+        row = conn.execute("SELECT 1 FROM cases WHERE id = ?", (case_id,)).fetchone()
+    return row is not None
+
+
 def ingest_processed_result(
     case_id: str,
     result: dict[str, Any],
@@ -190,14 +215,15 @@ def ingest_processed_result(
     evidence_status = infer_evidence_status(result, file_type)
     transaction_date = infer_transaction_date(result)
     summary = build_document_summary(result, document_title, file_type)
+    artifact_paths = document_artifact_paths(source_path)
 
     with connect() as conn:
         conn.execute(
             """
             INSERT INTO files
             (id, case_id, file_name, file_type, transaction_date, uploaded_at, source_path,
-             relative_path, storage_provider, processing_status, evidence_status, summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?)
+             relative_path, artifact_paths_json, storage_provider, processing_status, evidence_status, summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?, ?)
             """,
             (
                 document_id,
@@ -208,6 +234,7 @@ def ingest_processed_result(
                 now,
                 source_path,
                 normalize_relative_path(relative_path),
+                json.dumps([str(path) for path in artifact_paths], ensure_ascii=False),
                 processing_status,
                 evidence_status,
                 summary,
@@ -441,131 +468,291 @@ def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
     }
 
 
-def remove_folder(case_id: str, folder_path: str) -> dict[str, Any]:
-    normalized_folder = normalize_folder_path(folder_path)
-    if not normalized_folder:
-        raise ValueError("Folder path is required")
-
-    with connect() as conn:
-        if normalized_folder == ROOT_FOLDER_NAME:
-            file_rows = conn.execute(
+def get_case_file_rows(conn: sqlite3.Connection, case_id: str, folder_path: str | None = None) -> list[sqlite3.Row]:
+    if folder_path is None:
+        return list(conn.execute("SELECT * FROM files WHERE case_id = ? ORDER BY uploaded_at", (case_id,)))
+    if folder_path == ROOT_FOLDER_NAME:
+        return list(
+            conn.execute(
                 """
-                SELECT id, relative_path, source_path
-                FROM files
+                SELECT * FROM files
                 WHERE case_id = ?
                   AND (relative_path IS NULL OR relative_path = '')
+                ORDER BY uploaded_at
                 """,
                 (case_id,),
-            ).fetchall()
-        else:
-            file_rows = conn.execute(
-                """
-                SELECT id, relative_path, source_path
-                FROM files
-                WHERE case_id = ?
-                  AND relative_path IS NOT NULL
-                  AND relative_path != ''
-                  AND (relative_path = ? OR relative_path LIKE ?)
-                """,
-                (case_id, normalized_folder, f"{normalized_folder}/%"),
-            ).fetchall()
-        if not file_rows:
-            raise KeyError(normalized_folder)
-
-        document_ids = [row["id"] for row in file_rows]
-        document_nodes = conn.execute(
+            )
+        )
+    return list(
+        conn.execute(
             """
-            SELECT id FROM topology_nodes
-            WHERE case_id = ? AND entity_type = 'file' AND entity_id IN ({})
-            """.format(",".join("?" for _ in document_ids)),
-            (case_id, *document_ids),
-        ).fetchall()
-        document_node_ids = [row["id"] for row in document_nodes]
+            SELECT * FROM files
+            WHERE case_id = ?
+              AND relative_path IS NOT NULL
+              AND relative_path != ''
+              AND (relative_path = ? OR relative_path LIKE ?)
+            ORDER BY uploaded_at
+            """,
+            (case_id, folder_path, f"{folder_path}/%"),
+        )
+    )
 
-        derived_cap_rows = []
-        if document_node_ids:
-            derived_cap_rows = conn.execute(
-                """
+
+def collect_deletion_scope(conn: sqlite3.Connection, case_id: str, scope_type: str, scope_ref: str) -> dict[str, Any]:
+    case_row = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
+    if not case_row:
+        raise KeyError(case_id)
+
+    file_rows = get_case_file_rows(conn, case_id, scope_ref if scope_type == "folder" else None)
+    if scope_type == "folder" and not file_rows:
+        raise KeyError(scope_ref)
+
+    document_ids = [row["id"] for row in file_rows]
+    document_node_ids: list[str] = []
+    if document_ids:
+        placeholders = ",".join("?" for _ in document_ids)
+        document_node_ids = [
+            row["id"]
+            for row in conn.execute(
+                f"""
+                SELECT id FROM topology_nodes
+                WHERE case_id = ? AND entity_type = 'file' AND entity_id IN ({placeholders})
+                """,
+                (case_id, *document_ids),
+            )
+        ]
+
+    cap_node_ids: list[str] = []
+    cap_version_ids: list[str] = []
+    if scope_type == "case":
+        cap_rows = list(conn.execute("SELECT topology_node_id, id FROM captable_versions WHERE case_id = ?", (case_id,)))
+        cap_node_ids = [row["topology_node_id"] for row in cap_rows]
+        cap_version_ids = [row["id"] for row in cap_rows]
+    elif document_node_ids:
+        placeholders = ",".join("?" for _ in document_node_ids)
+        derived_cap_rows = list(
+            conn.execute(
+                f"""
                 SELECT id, entity_id
                 FROM topology_nodes
                 WHERE case_id = ?
                   AND node_type = 'captable_version'
-                  AND parent_id IN ({})
-                """.format(",".join("?" for _ in document_node_ids)),
+                  AND parent_id IN ({placeholders})
+                """,
                 (case_id, *document_node_ids),
-            ).fetchall()
-
+            )
+        )
         cap_node_ids = [row["id"] for row in derived_cap_rows]
         cap_version_ids = [row["entity_id"] for row in derived_cap_rows]
-        now = utc_now()
-        source_paths = {row["source_path"] for row in file_rows if row["source_path"]}
 
-        if cap_version_ids:
-            conn.execute(
-                "DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({})".format(",".join("?" for _ in cap_node_ids)),
-                (case_id, *cap_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM captable_versions WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in cap_version_ids)),
-                (case_id, *cap_version_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({0}) OR to_node_id IN ({0}))".format(
-                    ",".join("?" for _ in cap_node_ids)
-                ),
-                (case_id, *cap_node_ids, *cap_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_nodes WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in cap_node_ids)),
-                (case_id, *cap_node_ids),
-            )
-
-        if document_node_ids:
-            conn.execute(
-                "DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({})".format(",".join("?" for _ in document_node_ids)),
-                (case_id, *document_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({0}) OR to_node_id IN ({0}))".format(
-                    ",".join("?" for _ in document_node_ids)
-                ),
-                (case_id, *document_node_ids, *document_node_ids),
-            )
-            conn.execute(
-                "DELETE FROM topology_nodes WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in document_node_ids)),
-                (case_id, *document_node_ids),
-            )
-
-        conn.execute(
-            "DELETE FROM structured_results WHERE case_id = ? AND document_id IN ({})".format(",".join("?" for _ in document_ids)),
-            (case_id, *document_ids),
-        )
-        conn.execute(
-            "DELETE FROM files WHERE case_id = ? AND id IN ({})".format(",".join("?" for _ in document_ids)),
-            (case_id, *document_ids),
-        )
-        conn.execute(
-            """
-            INSERT INTO operation_logs (id, case_id, action, node_id, description, created_at)
-            VALUES (?, ?, 'archive', ?, ?, ?)
-            """,
-            (
-                unique_id("log-folder-remove"),
-                case_id,
-                normalized_folder,
-                f"Removed folder {normalized_folder} and its uploaded documents.",
-                now,
-            ),
-        )
-        reset_case_head_pointers(conn, case_id, now)
-        rebuild_case_captable_versions(conn, case_id)
-
-    remove_document_artifacts(source_paths)
+    message_rows = list(conn.execute("SELECT id FROM case_messages WHERE case_id = ?", (case_id,)))
+    artifact_paths = document_artifact_paths_from_rows(file_rows)
+    structured_result_count = count_ids(conn, "structured_results", "document_id", case_id, document_ids)
 
     return {
-        "removedFileCount": len(document_ids),
-        "workbench": build_workbench_snapshot(case_id),
+        "case": case_row,
+        "file_rows": file_rows,
+        "document_ids": document_ids,
+        "document_node_ids": document_node_ids,
+        "cap_node_ids": cap_node_ids,
+        "cap_version_ids": cap_version_ids,
+        "message_ids": [row["id"] for row in message_rows],
+        "artifact_paths": artifact_paths,
+        "counts": {
+            "files": len(file_rows),
+            "structuredResults": structured_result_count if scope_type == "folder" else count_rows(conn, "structured_results", case_id),
+            "captableVersions": len(cap_version_ids),
+            "messages": len(message_rows),
+        },
     }
+
+
+def perform_case_deletion(case_id: str, scope_type: str, scope_ref: str) -> dict[str, Any]:
+    init_store()
+    requested_at = utc_now()
+
+    with connect() as conn:
+        scope = collect_deletion_scope(conn, case_id, scope_type, scope_ref)
+        deletion_event_id = unique_id("deletion")
+        create_deletion_event(conn, deletion_event_id, case_id, scope_type, scope_ref, scope["counts"], requested_at)
+
+        if scope_type == "case":
+            delete_case_records(conn, case_id)
+        else:
+            delete_folder_records(conn, case_id, scope_ref, scope, requested_at)
+
+    file_errors = remove_document_artifacts(scope["artifact_paths"])
+    if file_errors:
+        error_message = "; ".join(file_errors)
+        mark_deletion_event_failed(deletion_event_id, error_message)
+        raise RuntimeError(f"Failed to complete physical deletion. deletion_event_id={deletion_event_id}. {error_message}")
+
+    mark_deletion_event_completed(deletion_event_id)
+    return {
+        "scopeType": scope_type,
+        "scopeRef": scope_ref,
+        "removedCounts": scope["counts"],
+        "deletionEventId": deletion_event_id,
+        "workbench": build_workbench_snapshot(case_id) if scope_type == "folder" else None,
+    }
+
+
+def create_deletion_event(
+    conn: sqlite3.Connection,
+    deletion_event_id: str,
+    case_id: str,
+    scope_type: str,
+    scope_ref: str,
+    counts: dict[str, int],
+    requested_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO deletion_events
+        (id, scope_type, case_id, scope_ref, removed_file_count, removed_structured_result_count,
+         removed_captable_version_count, removed_message_count, status, requested_at, completed_at, error_message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+        """,
+        (
+            deletion_event_id,
+            scope_type,
+            case_id,
+            scope_ref,
+            counts["files"],
+            counts["structuredResults"],
+            counts["captableVersions"],
+            counts["messages"],
+            DELETION_STATUS_PENDING,
+            requested_at,
+        ),
+    )
+
+
+def mark_deletion_event_completed(deletion_event_id: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE deletion_events SET status = ?, completed_at = ?, error_message = NULL WHERE id = ?",
+            (DELETION_STATUS_COMPLETED, utc_now(), deletion_event_id),
+        )
+
+
+def mark_deletion_event_failed(deletion_event_id: str, error_message: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE deletion_events SET status = ?, completed_at = ?, error_message = ? WHERE id = ?",
+            (DELETION_STATUS_FAILED, utc_now(), error_message, deletion_event_id),
+        )
+
+
+def delete_folder_records(
+    conn: sqlite3.Connection,
+    case_id: str,
+    folder_path: str,
+    scope: dict[str, Any],
+    now: str,
+) -> None:
+    document_ids = scope["document_ids"]
+    document_node_ids = scope["document_node_ids"]
+    cap_node_ids = scope["cap_node_ids"]
+    cap_version_ids = scope["cap_version_ids"]
+
+    if cap_version_ids:
+        delete_operation_logs_for_nodes(conn, case_id, cap_node_ids)
+        delete_refs_for_nodes(conn, case_id, cap_node_ids)
+        delete_ids(conn, "captable_versions", "id", case_id, cap_version_ids)
+        delete_ids(conn, "topology_nodes", "id", case_id, cap_node_ids)
+
+    if document_node_ids:
+        delete_operation_logs_for_nodes(conn, case_id, document_node_ids)
+        delete_refs_for_nodes(conn, case_id, document_node_ids)
+        delete_ids(conn, "topology_nodes", "id", case_id, document_node_ids)
+
+    delete_ids(conn, "structured_results", "document_id", case_id, document_ids)
+    delete_ids(conn, "files", "id", case_id, document_ids)
+    conn.execute("DELETE FROM case_messages WHERE case_id = ?", (case_id,))
+    conn.execute(
+        """
+        INSERT INTO operation_logs (id, case_id, action, node_id, description, created_at)
+        VALUES (?, ?, 'archive', ?, ?, ?)
+        """,
+        (
+            unique_id("log-folder-remove"),
+            case_id,
+            folder_path,
+            f"Permanently deleted folder {folder_path} and its workspace-derived data.",
+            now,
+        ),
+    )
+    reset_case_head_pointers(conn, case_id, now)
+    rebuild_case_captable_versions(conn, case_id)
+
+
+def delete_case_records(conn: sqlite3.Connection, case_id: str) -> None:
+    conn.execute("DELETE FROM case_messages WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM operation_logs WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM topology_refs WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM captable_versions WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM topology_nodes WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM structured_results WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM files WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+
+
+def delete_ids(
+    conn: sqlite3.Connection,
+    table: str,
+    field: str,
+    case_id: str,
+    values: list[str],
+) -> None:
+    if not values:
+        return
+    placeholders = ",".join("?" for _ in values)
+    conn.execute(f"DELETE FROM {table} WHERE case_id = ? AND {field} IN ({placeholders})", (case_id, *values))
+
+
+def delete_operation_logs_for_nodes(conn: sqlite3.Connection, case_id: str, node_ids: list[str]) -> None:
+    if not node_ids:
+        return
+    placeholders = ",".join("?" for _ in node_ids)
+    conn.execute(f"DELETE FROM operation_logs WHERE case_id = ? AND node_id IN ({placeholders})", (case_id, *node_ids))
+
+
+def delete_refs_for_nodes(conn: sqlite3.Connection, case_id: str, node_ids: list[str]) -> None:
+    if not node_ids:
+        return
+    placeholders = ",".join("?" for _ in node_ids)
+    conn.execute(
+        f"DELETE FROM topology_refs WHERE case_id = ? AND (from_node_id IN ({placeholders}) OR to_node_id IN ({placeholders}))",
+        (case_id, *node_ids, *node_ids),
+    )
+
+
+def count_rows(conn: sqlite3.Connection, table: str, case_id: str) -> int:
+    row = conn.execute(f"SELECT COUNT(*) AS count FROM {table} WHERE case_id = ?", (case_id,)).fetchone()
+    return int(row["count"])
+
+
+def count_ids(conn: sqlite3.Connection, table: str, field: str, case_id: str, values: list[str]) -> int:
+    if not values:
+        return 0
+    placeholders = ",".join("?" for _ in values)
+    row = conn.execute(
+        f"SELECT COUNT(*) AS count FROM {table} WHERE case_id = ? AND {field} IN ({placeholders})",
+        (case_id, *values),
+    ).fetchone()
+    return int(row["count"])
+
+
+def remove_folder(case_id: str, folder_path: str) -> dict[str, Any]:
+    normalized_folder = normalize_folder_path(folder_path)
+    if not normalized_folder:
+        raise ValueError("Folder path is required")
+    return perform_case_deletion(case_id, "folder", normalized_folder)
+
+
+def delete_case(case_id: str) -> dict[str, Any]:
+    return perform_case_deletion(case_id, "case", case_id)
 
 
 def list_case_messages(case_id: str = DEFAULT_CASE_ID) -> list[dict[str, Any]]:
@@ -1131,19 +1318,43 @@ def artifact_stem_for_source_path(source_path: str) -> str:
     return stem.strip("_") or "document"
 
 
-def remove_document_artifacts(source_paths: set[str]) -> None:
-    for source_path in source_paths:
-        source = Path(source_path)
-        artifact_stem = artifact_stem_for_source_path(source_path)
-        candidates = DEFAULT_OUTPUT_DIR / "candidates" / f"{artifact_stem}.candidates.json"
-        parsed = DEFAULT_OUTPUT_DIR / "parsed" / f"{artifact_stem}.parsed.json"
-        output_json = DEFAULT_OUTPUT_DIR / f"{artifact_stem}.json"
-        for path in (source, candidates, parsed, output_json):
+def document_artifact_paths(source_path: str) -> list[Path]:
+    source = Path(source_path)
+    artifact_stem = artifact_stem_for_source_path(source_path)
+    return [
+        source,
+        DEFAULT_OUTPUT_DIR / "candidates" / f"{artifact_stem}.candidates.json",
+        DEFAULT_OUTPUT_DIR / "parsed" / f"{artifact_stem}.parsed.json",
+        DEFAULT_OUTPUT_DIR / f"{artifact_stem}.json",
+    ]
+
+
+def document_artifact_paths_from_rows(file_rows: list[sqlite3.Row]) -> set[Path]:
+    paths: set[Path] = set()
+    for row in file_rows:
+        raw_artifacts = row["artifact_paths_json"] if "artifact_paths_json" in row.keys() else None
+        if raw_artifacts:
             try:
-                if path.exists():
-                    path.unlink()
-            except OSError:
+                for item in json.loads(raw_artifacts):
+                    if item:
+                        paths.add(Path(str(item)))
                 continue
+            except json.JSONDecodeError:
+                pass
+        for path in document_artifact_paths(row["source_path"]):
+            paths.add(path)
+    return paths
+
+
+def remove_document_artifacts(paths: set[Path]) -> list[str]:
+    errors: list[str] = []
+    for path in sorted(paths):
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError as exc:
+            errors.append(f"{path}: {exc}")
+    return errors
 
 
 def parse_number(value: str) -> float:

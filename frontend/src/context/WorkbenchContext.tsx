@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { topologyApi } from "../lib/api/topologyApi";
-import type { ChatMessage, TopologyNodeDetail, WorkbenchSnapshot } from "../types/topology";
+import type { ChatMessage, DeletionResponse, TopologyNodeDetail, WorkbenchSnapshot } from "../types/topology";
 
 interface WorkbenchContextValue {
   snapshot: WorkbenchSnapshot | null;
@@ -26,7 +26,8 @@ interface WorkbenchContextValue {
   archiveNode: (nodeId: string) => Promise<void>;
   setViewingVersion: (nodeId: string) => Promise<void>;
   uploadFiles: (files: File[], relativePaths?: Array<string | null>) => Promise<Awaited<ReturnType<typeof topologyApi.uploadFiles>>>;
-  removeFolder: (folderPath: string) => Promise<Awaited<ReturnType<typeof topologyApi.removeFolder>>>;
+  removeFolder: (folderPath: string) => Promise<DeletionResponse>;
+  deleteCase: (confirmText: string) => Promise<DeletionResponse>;
   sendChatMessage: (message: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -175,6 +176,22 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const deleteCase = useCallback(async (confirmText: string) => {
+    try {
+      const result = await topologyApi.deleteCase(confirmText);
+      setSnapshot(null);
+      setChatMessages([]);
+      setSelectedNodeId(null);
+      setSelectedNodeDetail(null);
+      setApiError(topologyApi.getLastError());
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete workspace";
+      setApiError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }, []);
+
   const sendChatMessage = useCallback(async (message: string) => {
     setChatSending(true);
     try {
@@ -208,6 +225,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       setViewingVersion,
       uploadFiles,
       removeFolder,
+      deleteCase,
       sendChatMessage,
       refresh,
     }),
@@ -221,6 +239,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       mergeNode,
       refresh,
       rejectNode,
+      deleteCase,
       sendChatMessage,
       selectNode,
       selectedNodeDetail,

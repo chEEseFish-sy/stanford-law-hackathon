@@ -205,6 +205,14 @@ python3 backend/process_docx_data.py --input data --output storage
 - 结构化抽取结果保存在 `storage/`。
 - SQLite 工作台数据库位于 `storage/vericap.sqlite3`。
 - 如果后端不可用，前端会回退到内置演示数据。
+- 用户上传文件的运行时产物位于 `storage/uploads/`、`storage/parsed/`、`storage/candidates/` 和 `storage/*.json`，这些目录应与样例 `data/` 分离管理。
+
+## 删除与保留
+
+- 当前工作台删除采用硬删除。
+- 文件夹级删除会永久删除该文件夹下的上传原件、结构化结果、working cap table 派生数据和当前 case 聊天上下文。
+- case 级删除会永久删除整个工作台的数据库记录与相关运行时文件。
+- 删除审计只保留最小元数据，例如删除范围、删除数量、时间和状态，不保留被删文件正文或聊天正文。
 
 ## 当前限制
 

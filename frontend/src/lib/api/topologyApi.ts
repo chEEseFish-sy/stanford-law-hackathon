@@ -1,4 +1,4 @@
-import type { ChatMessage, TopologyNodeDetail, WorkbenchSnapshot } from "../../types/topology";
+import type { ChatMessage, DeletionResponse, TopologyNodeDetail, WorkbenchSnapshot } from "../../types/topology";
 
 let lastError: string | null = null;
 
@@ -94,16 +94,22 @@ export const topologyApi = {
   },
 
   async removeFolder(folderPath: string) {
-    return await requestJson<{
-      removedFolderPath: string;
-      removedFileCount: number;
-      workbench: WorkbenchSnapshot;
-    }>(`/api/cases/${DEFAULT_CASE_ID}/folders/remove`, {
+    return await requestJson<DeletionResponse>(`/api/cases/${DEFAULT_CASE_ID}/folders/remove`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ folderPath }),
+    });
+  },
+
+  async deleteCase(confirmText: string) {
+    return await requestJson<DeletionResponse>(`/api/cases/${DEFAULT_CASE_ID}/delete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ confirmText }),
     });
   },
 
@@ -130,6 +136,7 @@ export const topologyApi = {
       getNodeDetail: "GET /api/topology/nodes/:nodeId/detail",
       uploadFiles: "POST /api/cases/:caseId/files",
       removeFolder: "POST /api/cases/:caseId/folders/remove",
+      deleteCase: "POST /api/cases/:caseId/delete",
       sendChatMessage: "POST /api/cases/:caseId/chat",
       mergeDraft: "POST /api/topology/nodes/:nodeId/merge",
       rejectDraft: "POST /api/topology/nodes/:nodeId/reject",

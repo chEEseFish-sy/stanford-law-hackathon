@@ -39,6 +39,7 @@ try:
         build_index_from_db,
         list_case_messages,
         build_workbench_snapshot,
+        delete_case,
         get_document_record,
         get_node_detail,
         ingest_processed_result,
@@ -68,6 +69,7 @@ except ImportError:
         build_index_from_db,
         list_case_messages,
         build_workbench_snapshot,
+        delete_case,
         get_document_record,
         get_node_detail,
         ingest_processed_result,
@@ -109,6 +111,10 @@ class ChatRequest(BaseModel):
 
 class FolderRemoveRequest(BaseModel):
     folderPath: str
+
+
+class CaseDeleteRequest(BaseModel):
+    confirmText: str
 
 
 def pipeline_model_name() -> str:
@@ -286,11 +292,20 @@ def remove_case_folder(case_id: str, payload: FolderRemoveRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return {
-        "removedFolderPath": payload.folderPath,
-        "removedFileCount": result["removedFileCount"],
-        "workbench": result["workbench"],
-    }
+    return result
+
+
+@app.post("/api/cases/{case_id}/delete")
+def delete_case_route(case_id: str, payload: CaseDeleteRequest) -> dict:
+    if payload.confirmText.strip().upper() != "DELETE":
+        raise HTTPException(status_code=400, detail="Confirmation text must be DELETE")
+
+    try:
+        return delete_case(case_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Case {case_id} not found") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/api/cases/{case_id}/chat")

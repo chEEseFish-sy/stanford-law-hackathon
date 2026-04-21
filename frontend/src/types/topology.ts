@@ -192,3 +192,16 @@ export interface WorkbenchSnapshot {
   documentPreviews: DocumentPreview[];
   documentComparisons: DocumentComparison[];
 }
+
+export interface DeletionResponse {
+  scopeType: "folder" | "case";
+  scopeRef: string;
+  removedCounts: {
+    files: number;
+    structuredResults: number;
+    captableVersions: number;
+    messages: number;
+  };
+  deletionEventId: string;
+  workbench: WorkbenchSnapshot | null;
+}
