@@ -261,6 +261,7 @@ export function Dashboard() {
     useWorkbench();
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
   const workspaceName = snapshot?.workspace.caseName ?? "Workspace";
+  const sampleCapTableCount = snapshot?.captableVersions.length ?? 0;
   const isBackendUnavailable = entryState === "backend_unreachable";
   const isBackendConnected = !isBackendUnavailable;
   const isLlmConfigured = Boolean(llmConfig.apiKey.trim() || systemStatus?.llm.configured);
@@ -356,6 +357,11 @@ export function Dashboard() {
         documents: groupedDocuments.sort((left, right) => left.fileName.localeCompare(right.fileName)),
       }));
   }, [documentItems]);
+
+  const recommendedSampleDocument = useMemo(
+    () => documentItems.find((item) => !item.isUpload) ?? documentItems[0] ?? null,
+    [documentItems],
+  );
 
   useEffect(() => {
     if (selectedDocumentId && !documentItems.some((item) => item.id === selectedDocumentId)) {
@@ -876,6 +882,8 @@ export function Dashboard() {
                         ? "后端未连接"
                         : entryState === "demo_available"
                           ? "打开示例工作区"
+                          : isDefaultCase && documentItems.length > 0
+                            ? "开始浏览示例工作区"
                           : snapshot
                             ? "开始新的工作区"
                             : "Workspace 已永久删除"}
@@ -887,6 +895,8 @@ export function Dashboard() {
                         ? "当前无法连接到本地后端。请先运行 `npm run dev`，然后刷新页面。Workspace Settings 仍然可用。"
                         : entryState === "demo_available"
                           ? "当前有现成的示例数据可直接查看。你也可以跳过示例，直接上传新的 DOCX 文档开始审阅。"
+                          : isDefaultCase && documentItems.length > 0
+                            ? "你正在查看内置示例数据。建议先打开一份示例文件，确认文档阅读区、文件列表和当前工作区状态，再决定是否上传你自己的 DOCX。"
                           : snapshot
                             ? "从右侧 `Files` 选择一份文档，或先上传新的 DOCX 文档。进入后使用左右按钮切换分页。"
                             : "当前 case 的上传文件、结构化结果、工作台派生数据和聊天上下文已经被永久清理。你可以上传新的 DOCX 重新开始。"}
@@ -926,6 +936,43 @@ export function Dashboard() {
                     {!isLlmConfigured ? (
                       <div className="mt-4 rounded-[16px] border border-amber-300/15 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
                         AI explanation is limited until you add an API key in Workspace Settings.
+                      </div>
+                    ) : null}
+                    {isDefaultCase && documentItems.length > 0 ? (
+                      <div className="mt-4 rounded-[18px] border border-sky-400/14 bg-sky-500/[0.08] px-4 py-4 text-left">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-sky-100/70">Guided Sample</div>
+                            <div className="mt-2 text-sm font-semibold text-white">Suggested first step</div>
+                            <div className="mt-2 text-sm leading-6 text-white/65">
+                              Open {recommendedSampleDocument?.fileName ?? "the first sample file"} first, then use the Files
+                              panel to compare how the sample workspace is organized.
+                            </div>
+                          </div>
+                          <div className="rounded-[14px] border border-white/10 bg-black/20 px-3 py-2 text-right">
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/38">Sample Data</div>
+                            <div className="mt-2 text-sm font-semibold text-white">{documentItems.length} docs</div>
+                            <div className="mt-1 text-xs text-white/50">{sampleCapTableCount} cap table views</div>
+                          </div>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <button
+                            onClick={() => {
+                              if (recommendedSampleDocument) {
+                                setSelectedDocumentId(recommendedSampleDocument.id);
+                              }
+                            }}
+                            className="rounded-full bg-sky-500/14 px-4 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/20 active:scale-[0.98]"
+                          >
+                            Open Recommended File
+                          </button>
+                          <button
+                            onClick={() => setIsRightPanelCollapsed(false)}
+                            className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/75 transition hover:bg-white/[0.08] active:scale-[0.98]"
+                          >
+                            Review Files Panel
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -1105,14 +1152,26 @@ export function Dashboard() {
                       Settings
                     </button>
                     <div className="text-right">
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-white/38">Workspace</div>
-                      <div className="mt-1 text-sm font-semibold text-white">Files</div>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-white/38">
+                        {isDefaultCase ? "Sample Workspace" : "Workspace"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white">{isDefaultCase ? "Sample Files" : "Files"}</div>
                     </div>
                     <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
                       {documentItems.length}
                     </div>
                   </div>
                 </div>
+
+                {isDefaultCase ? (
+                  <div className="mt-3 rounded-[16px] border border-sky-400/15 bg-sky-500/10 px-3 py-3">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-sky-100/70">Sample Workspace</div>
+                    <div className="mt-2 text-sm font-semibold text-white">You are viewing built-in demonstration data.</div>
+                    <div className="mt-2 text-xs leading-5 text-white/62">
+                      Use this workspace to understand the file layout, document reader, and evidence-backed workflow before uploading your own matter.
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2">
@@ -1256,9 +1315,11 @@ export function Dashboard() {
               <div className="scrollbar-hidden flex-1 min-h-0 space-y-2 overflow-y-auto px-3 py-3">
                 {folderGroups.length === 0 ? (
                   <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-5 text-sm leading-6 text-white/46">
-                    {canUseSampleWorkspace && !isDefaultCase
-                      ? "当前没有文档。你可以上传 DOCX，或在首屏打开现有示例工作区。"
-                      : "还没有文档。上传 DOCX 文件后，它们会出现在这里。"}
+                    {isDefaultCase
+                      ? "示例工作区当前没有可显示的文件。你可以切回私有工作区并上传 DOCX，或刷新后再次检查示例数据。"
+                      : canUseSampleWorkspace
+                        ? "当前没有文档。你可以上传 DOCX，或在首屏打开现有示例工作区。"
+                        : "当前没有文档。上传 DOCX 文件后，它们会出现在这里。"}
                   </div>
                 ) : null}
 
