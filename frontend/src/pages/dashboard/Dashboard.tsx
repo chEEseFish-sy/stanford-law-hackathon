@@ -239,7 +239,19 @@ function DocxPageReader({
 }
 
 export function Dashboard() {
-  const { snapshot, chatMessages, chatSending, apiError, sendChatMessage, uploadFiles, removeFolder, deleteCase } =
+  const {
+    caseId,
+    llmConfig,
+    snapshot,
+    chatMessages,
+    chatSending,
+    apiError,
+    sendChatMessage,
+    uploadFiles,
+    removeFolder,
+    deleteCase,
+    updateLlmConfig,
+  } =
     useWorkbench();
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
   const workspaceName = snapshot?.workspace.caseName ?? "Workspace";
@@ -259,6 +271,8 @@ export function Dashboard() {
   const [caseDeleteConfirmText, setCaseDeleteConfirmText] = useState("");
   const [caseDeleteError, setCaseDeleteError] = useState<string | null>(null);
   const [isDeletingCase, setIsDeletingCase] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(llmConfig.apiKey);
+  const [modelNameInput, setModelNameInput] = useState(llmConfig.modelName);
   const [chatInput, setChatInput] = useState("");
   const [wordPageCount, setWordPageCount] = useState(0);
   const [isWordRendererLoading, setIsWordRendererLoading] = useState(false);
@@ -542,6 +556,13 @@ export function Dashboard() {
     }
   }, [caseDeleteConfirmText, deleteCase]);
 
+  const handleSaveLlmSettings = useCallback(() => {
+    updateLlmConfig({
+      apiKey: apiKeyInput,
+      modelName: modelNameInput,
+    });
+  }, [apiKeyInput, modelNameInput, updateLlmConfig]);
+
   const activeDocumentItem = documentItems.find((document) => document.id === selectedDocumentId) ?? null;
   const activeUploadedDocument = uploadedDocuments.find((document) => document.id === selectedDocumentId) ?? null;
   const activeServerDocument = documents.find((document) => document.id === selectedDocumentId) ?? null;
@@ -555,8 +576,8 @@ export function Dashboard() {
     if (!activeServerDocument?.id) {
       return null;
     }
-    return topologyApi.getDocumentDownloadUrl(activeServerDocument.id);
-  }, [activeServerDocument?.id]);
+    return topologyApi.getDocumentDownloadUrl(caseId, activeServerDocument.id);
+  }, [activeServerDocument?.id, caseId]);
 
   const totalPages = activeDocumentIsDocx ? wordPageCount : 0;
 
@@ -570,6 +591,11 @@ export function Dashboard() {
       setActivePageIndex(totalPages - 1);
     }
   }, [activePageIndex, totalPages]);
+
+  useEffect(() => {
+    setApiKeyInput(llmConfig.apiKey);
+    setModelNameInput(llmConfig.modelName);
+  }, [llmConfig]);
 
   const canGoToPreviousPage = activePageIndex > 0;
   const canGoToNextPage = activePageIndex < totalPages - 1;
@@ -704,6 +730,8 @@ export function Dashboard() {
                     placeholder={
                       !snapshot
                         ? "Upload documents to start a new workspace..."
+                        : !llmConfig.apiKey.trim()
+                          ? "Add your API key in Workspace Settings to enable chat..."
                         : selectedDocumentId
                           ? "Ask about the active document..."
                           : "Select a document, then ask a question..."
@@ -711,7 +739,7 @@ export function Dashboard() {
                   />
                   <button
                     onClick={() => void handleSendMessage()}
-                    disabled={!snapshot || !chatInput.trim() || chatSending}
+                    disabled={!snapshot || !llmConfig.apiKey.trim() || !chatInput.trim() || chatSending}
                     className={cn(
                       "flex h-10 w-10 items-center justify-center rounded-full transition",
                       !chatInput.trim() || chatSending
@@ -1032,6 +1060,37 @@ export function Dashboard() {
                     ))}
                   </div>
                 ) : null}
+
+                <div className="mt-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/42">Workspace Settings</div>
+                  <div className="mt-2 text-sm font-semibold text-white">LLM Session Config</div>
+                  <div className="mt-2 text-xs leading-5 text-white/52">
+                    API key and model stay in this browser session only. Leave API key empty to use local deterministic processing.
+                  </div>
+                  <div className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/38">Case ID</div>
+                  <div className="mt-1 truncate text-xs text-white/62">{caseId}</div>
+                  <div className="mt-3 grid gap-2">
+                    <input
+                      value={apiKeyInput}
+                      onChange={(event) => setApiKeyInput(event.target.value)}
+                      type="password"
+                      placeholder="Enter your LLM API key"
+                      className="w-full rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+                    />
+                    <input
+                      value={modelNameInput}
+                      onChange={(event) => setModelNameInput(event.target.value)}
+                      placeholder="Model name"
+                      className="w-full rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
+                    />
+                    <button
+                      onClick={handleSaveLlmSettings}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/80 transition hover:bg-white/[0.08] active:scale-[0.98]"
+                    >
+                      Save Session Settings
+                    </button>
+                  </div>
+                </div>
 
                 {snapshot ? (
                   <div className="mt-3 rounded-[18px] border border-rose-400/14 bg-rose-500/[0.08] px-3 py-3">

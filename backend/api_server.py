@@ -107,6 +107,8 @@ init_store()
 
 class ChatRequest(BaseModel):
     message: str
+    llmApiKey: str | None = None
+    llmModelName: str | None = None
 
 
 class FolderRemoveRequest(BaseModel):
@@ -125,6 +127,16 @@ def pipeline_model_name() -> str:
 def llm_api_key() -> str:
     load_dotenv_if_available()
     return os.getenv("LLM_API_KEY", "").strip()
+
+
+def resolve_model_name(override: str | None = None) -> str:
+    candidate = (override or "").strip()
+    return candidate or pipeline_model_name()
+
+
+def resolve_api_key(override: str | None = None) -> str:
+    candidate = (override or "").strip()
+    return candidate or llm_api_key()
 
 
 def build_case_chat_prompt(case_id: str, message: str) -> str:
@@ -169,11 +181,11 @@ User message:
 """.strip()
 
 
-def generate_case_chat_reply(case_id: str, message: str) -> str:
-    api_key = llm_api_key()
+def generate_case_chat_reply(case_id: str, message: str, api_key_override: str | None = None, model_name_override: str | None = None) -> str:
+    api_key = resolve_api_key(api_key_override)
     if not api_key:
-        raise RuntimeError("LLM_API_KEY is missing. Add it to the root .env file.")
-    extractor = GeminiExtractor(api_key=api_key, model=pipeline_model_name())
+        raise RuntimeError("LLM API key is missing. Add it in workspace settings or configure the backend environment.")
+    extractor = GeminiExtractor(api_key=api_key, model=resolve_model_name(model_name_override))
     return extractor.generate_text(build_case_chat_prompt(case_id, message))
 
 
@@ -278,9 +290,11 @@ def upload_case_files(
     files: Annotated[list[UploadFile], File()],
     file_paths: Annotated[str | None, Form()] = None,
     use_llm: Annotated[bool, Form()] = False,
+    llm_api_key: Annotated[str | None, Form()] = None,
+    llm_model_name: Annotated[str | None, Form()] = None,
     task: Annotated[list[str] | None, Form()] = None,
 ) -> JSONResponse:
-    return process_uploads(case_id, files, file_paths, use_llm, task)
+    return process_uploads(case_id, files, file_paths, use_llm, llm_api_key, llm_model_name, task)
 
 
 @app.post("/api/cases/{case_id}/folders/remove")
@@ -315,7 +329,7 @@ def chat_case(case_id: str, payload: ChatRequest) -> dict:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     try:
-        reply = generate_case_chat_reply(case_id, message)
+        reply = generate_case_chat_reply(case_id, message, payload.llmApiKey, payload.llmModelName)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
@@ -346,9 +360,11 @@ def upload_documents(
     files: Annotated[list[UploadFile], File()],
     file_paths: Annotated[str | None, Form()] = None,
     use_llm: Annotated[bool, Form()] = False,
+    llm_api_key: Annotated[str | None, Form()] = None,
+    llm_model_name: Annotated[str | None, Form()] = None,
     task: Annotated[list[str] | None, Form()] = None,
 ) -> JSONResponse:
-    return process_uploads(DEFAULT_CASE_ID, files, file_paths, use_llm, task)
+    return process_uploads(DEFAULT_CASE_ID, files, file_paths, use_llm, llm_api_key, llm_model_name, task)
 
 
 def process_uploads(
@@ -356,6 +372,8 @@ def process_uploads(
     files: list[UploadFile],
     file_paths: str | None,
     use_llm: bool,
+    llm_api_key_override: str | None,
+    llm_model_name_override: str | None,
     task: list[str] | None,
 ) -> JSONResponse:
     UPLOAD_INPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -370,6 +388,9 @@ def process_uploads(
     failures = []
     topology_updates = []
     relative_paths = parse_file_paths_metadata(file_paths, len(files))
+    effective_api_key = resolve_api_key(llm_api_key_override)
+    effective_model_name = resolve_model_name(llm_model_name_override)
+    enable_llm = use_llm and bool(effective_api_key)
 
     for index, upload in enumerate(files):
         original_name = Path(upload.filename or "").name
@@ -388,10 +409,11 @@ def process_uploads(
             result = process_file(
                 path=destination,
                 output_dir=DEFAULT_OUTPUT_DIR,
-                use_llm=use_llm,
-                model=pipeline_model_name(),
+                use_llm=enable_llm,
+                model=effective_model_name,
                 max_chars=18000,
                 tasks=tasks,
+                api_key=effective_api_key if enable_llm else None,
             )
             processed.append(
                 {

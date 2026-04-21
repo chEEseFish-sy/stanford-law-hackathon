@@ -205,3 +205,8 @@ export interface DeletionResponse {
   deletionEventId: string;
   workbench: WorkbenchSnapshot | null;
 }
+
+export interface LlmSessionConfig {
+  apiKey: string;
+  modelName: string;
+}

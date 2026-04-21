@@ -1,11 +1,22 @@
-import type { ChatMessage, DeletionResponse, TopologyNodeDetail, WorkbenchSnapshot } from "../../types/topology";
+import type { ChatMessage, DeletionResponse, LlmSessionConfig, TopologyNodeDetail, WorkbenchSnapshot } from "../../types/topology";
 
 let lastError: string | null = null;
 
 const API_BASE_URL =
   (import.meta as ImportMeta & { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL ??
   "http://127.0.0.1:8000";
-const DEFAULT_CASE_ID = "case-default";
+
+const appendLlmConfig = (formData: FormData, llmConfig?: LlmSessionConfig | null) => {
+  const apiKey = llmConfig?.apiKey.trim() ?? "";
+  const modelName = llmConfig?.modelName.trim() ?? "";
+  if (apiKey) {
+    formData.append("use_llm", "true");
+    formData.append("llm_api_key", apiKey);
+  }
+  if (modelName) {
+    formData.append("llm_model_name", modelName);
+  }
+};
 
 const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`, init);
@@ -19,8 +30,8 @@ const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const topologyApi = {
-  async getWorkbenchSnapshot() {
-    return await requestJson<WorkbenchSnapshot>(`/api/workbench?case_id=${DEFAULT_CASE_ID}`);
+  async getWorkbenchSnapshot(caseId: string) {
+    return await requestJson<WorkbenchSnapshot>(`/api/workbench?case_id=${caseId}`);
   },
 
   async getCaseTopology(caseId: string) {
@@ -49,16 +60,16 @@ export const topologyApi = {
     });
   },
 
-  async setViewingVersion(nodeId: string) {
+  async setViewingVersion(caseId: string, nodeId: string) {
     const formData = new FormData();
     formData.append("node_id", nodeId);
-    return await requestJson<WorkbenchSnapshot>(`/api/cases/${DEFAULT_CASE_ID}/viewing-version`, {
+    return await requestJson<WorkbenchSnapshot>(`/api/cases/${caseId}/viewing-version`, {
       method: "POST",
       body: formData,
     });
   },
 
-  async uploadFiles(files: File[], relativePaths: Array<string | null> = []) {
+  async uploadFiles(caseId: string, files: File[], relativePaths: Array<string | null> = [], llmConfig?: LlmSessionConfig | null) {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
     formData.append(
@@ -69,7 +80,8 @@ export const topologyApi = {
         })),
       ),
     );
-    const response = await fetch(`${API_BASE_URL}/api/cases/${DEFAULT_CASE_ID}/files`, {
+    appendLlmConfig(formData, llmConfig);
+    const response = await fetch(`${API_BASE_URL}/api/cases/${caseId}/files`, {
       method: "POST",
       body: formData,
     });
@@ -81,7 +93,7 @@ export const topologyApi = {
       workbench: WorkbenchSnapshot;
     };
     if (!response.ok && (!Array.isArray(data.failures) || data.failures.length === 0)) {
-      const message = `API /api/cases/${DEFAULT_CASE_ID}/files failed (${response.status})`;
+      const message = `API /api/cases/${caseId}/files failed (${response.status})`;
       lastError = message;
       throw new Error(message);
     }
@@ -89,12 +101,12 @@ export const topologyApi = {
     return data;
   },
 
-  getDocumentDownloadUrl(documentId: string, caseId: string = DEFAULT_CASE_ID) {
+  getDocumentDownloadUrl(caseId: string, documentId: string) {
     return `${API_BASE_URL}/api/cases/${caseId}/documents/${documentId}/download`;
   },
 
-  async removeFolder(folderPath: string) {
-    return await requestJson<DeletionResponse>(`/api/cases/${DEFAULT_CASE_ID}/folders/remove`, {
+  async removeFolder(caseId: string, folderPath: string) {
+    return await requestJson<DeletionResponse>(`/api/cases/${caseId}/folders/remove`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -103,8 +115,8 @@ export const topologyApi = {
     });
   },
 
-  async deleteCase(confirmText: string) {
-    return await requestJson<DeletionResponse>(`/api/cases/${DEFAULT_CASE_ID}/delete`, {
+  async deleteCase(caseId: string, confirmText: string) {
+    return await requestJson<DeletionResponse>(`/api/cases/${caseId}/delete`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -113,16 +125,20 @@ export const topologyApi = {
     });
   },
 
-  async sendChatMessage(message: string) {
+  async sendChatMessage(caseId: string, message: string, llmConfig?: LlmSessionConfig | null) {
     return await requestJson<{
       reply: ChatMessage;
       messages: ChatMessage[];
-    }>(`/api/cases/${DEFAULT_CASE_ID}/chat`, {
+    }>(`/api/cases/${caseId}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        llmApiKey: llmConfig?.apiKey.trim() || null,
+        llmModelName: llmConfig?.modelName.trim() || null,
+      }),
     });
   },
 

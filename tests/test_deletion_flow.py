@@ -111,6 +111,18 @@ class DeletionFlowTests(unittest.TestCase):
         self.assertEqual(event["scope_type"], "case")
         self.assertFalse(any(store.DEFAULT_OUTPUT_DIR.glob("uploads/*.docx")))
 
+    def test_get_node_detail_uses_document_case_instead_of_default_case(self) -> None:
+        case_id = "case-isolated"
+        store.create_case(case_id, "Isolated")
+        self.seed_document(case_id, "Isolated SPA.docx", "isolated/Isolated SPA.docx", "Isolated SPA")
+
+        snapshot = store.build_workbench_snapshot(case_id)
+        node_id = snapshot["topology"]["nodes"][0]["id"]
+        detail = store.get_node_detail(node_id)
+
+        self.assertEqual(detail["node"]["id"], node_id)
+        self.assertEqual(detail["document"]["fileName"], "Isolated SPA.docx")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,6 +24,7 @@ DEFAULT_OUTPUT_DIR = ROOT_DIR / "storage"
 DB_PATH = DEFAULT_OUTPUT_DIR / "vericap.sqlite3"
 MIN_CAPTABLE_SHARE_COUNT = 1_000
 ROOT_FOLDER_NAME = "Root"
+DEFAULT_CASE_NAME = "Private financing audit"
 DELETION_STATUS_PENDING = "pending"
 DELETION_STATUS_COMPLETED = "completed"
 DELETION_STATUS_FAILED = "failed"
@@ -176,7 +177,7 @@ def seed_if_empty() -> None:
     if count:
         return
 
-    create_case(DEFAULT_CASE_ID, "Default financing audit")
+    create_case(DEFAULT_CASE_ID, DEFAULT_CASE_NAME)
 
 
 def create_case(case_id: str, name: str) -> None:
@@ -205,7 +206,7 @@ def ingest_processed_result(
     relative_path: str | None = None,
     stable_id: str | None = None,
 ) -> dict[str, Any]:
-    create_case(case_id, "Default financing audit")
+    create_case(case_id, DEFAULT_CASE_NAME)
     now = utc_now()
     source_file = str(result.get("source_file") or Path(source_path).name)
     document_id = unique_id(stable_id or f"file-{safe_stem(Path(source_file))}")
@@ -402,7 +403,7 @@ def build_workbench_snapshot(case_id: str = DEFAULT_CASE_ID) -> dict[str, Any]:
     with connect() as conn:
         case = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
         if not case:
-            create_case(case_id, "Default financing audit")
+            create_case(case_id, DEFAULT_CASE_NAME)
             case = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
 
         documents = [document_payload(row) for row in conn.execute("SELECT * FROM files WHERE case_id = ? ORDER BY uploaded_at", (case_id,))]
@@ -756,7 +757,7 @@ def delete_case(case_id: str) -> dict[str, Any]:
 
 
 def list_case_messages(case_id: str = DEFAULT_CASE_ID) -> list[dict[str, Any]]:
-    create_case(case_id, "Default financing audit")
+    create_case(case_id, DEFAULT_CASE_NAME)
     with connect() as conn:
         rows = conn.execute(
             "SELECT * FROM case_messages WHERE case_id = ? ORDER BY created_at, rowid",
@@ -774,7 +775,7 @@ def list_case_messages(case_id: str = DEFAULT_CASE_ID) -> list[dict[str, Any]]:
 
 
 def append_case_message(case_id: str, role: str, content: str) -> dict[str, Any]:
-    create_case(case_id, "Default financing audit")
+    create_case(case_id, DEFAULT_CASE_NAME)
     message = {
         "id": unique_id("msg"),
         "role": role,
@@ -793,7 +794,11 @@ def append_case_message(case_id: str, role: str, content: str) -> dict[str, Any]
 
 
 def get_node_detail(node_id: str) -> dict[str, Any]:
-    snapshot = build_workbench_snapshot(DEFAULT_CASE_ID)
+    with connect() as conn:
+        node_row = get_node(conn, node_id)
+    if not node_row:
+        raise KeyError(node_id)
+    snapshot = build_workbench_snapshot(node_row["case_id"])
     node = next((item for item in snapshot["topology"]["nodes"] if item["id"] == node_id), None)
     if not node:
         raise KeyError(node_id)

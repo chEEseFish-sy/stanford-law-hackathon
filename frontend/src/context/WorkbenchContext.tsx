@@ -8,9 +8,61 @@ import {
   type ReactNode,
 } from "react";
 import { topologyApi } from "../lib/api/topologyApi";
-import type { ChatMessage, DeletionResponse, TopologyNodeDetail, WorkbenchSnapshot } from "../types/topology";
+import type { ChatMessage, DeletionResponse, LlmSessionConfig, TopologyNodeDetail, WorkbenchSnapshot } from "../types/topology";
+
+const CASE_ID_STORAGE_KEY = "vericap.case_id";
+const LLM_CONFIG_STORAGE_KEY = "vericap.llm_config";
+const DEFAULT_LLM_MODEL_NAME = "gemini-3-flash-preview";
+
+const generateCaseId = () => `case-${crypto.randomUUID()}`;
+
+const readCaseId = () => {
+  if (typeof window === "undefined") {
+    return generateCaseId();
+  }
+  const existing = window.sessionStorage.getItem(CASE_ID_STORAGE_KEY)?.trim();
+  if (existing) {
+    return existing;
+  }
+  const next = generateCaseId();
+  window.sessionStorage.setItem(CASE_ID_STORAGE_KEY, next);
+  return next;
+};
+
+const persistCaseId = (caseId: string) => {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(CASE_ID_STORAGE_KEY, caseId);
+  }
+};
+
+const readLlmConfig = (): LlmSessionConfig => {
+  if (typeof window === "undefined") {
+    return { apiKey: "", modelName: DEFAULT_LLM_MODEL_NAME };
+  }
+  const raw = window.sessionStorage.getItem(LLM_CONFIG_STORAGE_KEY);
+  if (!raw) {
+    return { apiKey: "", modelName: DEFAULT_LLM_MODEL_NAME };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<LlmSessionConfig>;
+    return {
+      apiKey: parsed.apiKey ?? "",
+      modelName: parsed.modelName?.trim() || DEFAULT_LLM_MODEL_NAME,
+    };
+  } catch {
+    return { apiKey: "", modelName: DEFAULT_LLM_MODEL_NAME };
+  }
+};
+
+const persistLlmConfig = (config: LlmSessionConfig) => {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(LLM_CONFIG_STORAGE_KEY, JSON.stringify(config));
+  }
+};
 
 interface WorkbenchContextValue {
+  caseId: string;
+  llmConfig: LlmSessionConfig;
   snapshot: WorkbenchSnapshot | null;
   chatMessages: ChatMessage[];
   chatSending: boolean;
@@ -28,6 +80,7 @@ interface WorkbenchContextValue {
   uploadFiles: (files: File[], relativePaths?: Array<string | null>) => Promise<Awaited<ReturnType<typeof topologyApi.uploadFiles>>>;
   removeFolder: (folderPath: string) => Promise<DeletionResponse>;
   deleteCase: (confirmText: string) => Promise<DeletionResponse>;
+  updateLlmConfig: (next: LlmSessionConfig) => void;
   sendChatMessage: (message: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -35,6 +88,8 @@ interface WorkbenchContextValue {
 const WorkbenchContext = createContext<WorkbenchContextValue | undefined>(undefined);
 
 export function WorkbenchProvider({ children }: { children: ReactNode }) {
+  const [caseId, setCaseId] = useState(readCaseId);
+  const [llmConfig, setLlmConfig] = useState<LlmSessionConfig>(readLlmConfig);
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatSending, setChatSending] = useState(false);
@@ -51,7 +106,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await topologyApi.getWorkbenchSnapshot();
+      const next = await topologyApi.getWorkbenchSnapshot(caseId);
       setSnapshot(next);
       setApiError(topologyApi.getLastError());
     } catch (error) {
@@ -59,7 +114,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [caseId]);
 
   useEffect(() => {
     void refresh();
@@ -88,7 +143,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
 
   const syncAfterMutation = useCallback(async (nodeId?: string) => {
     try {
-      const next = await topologyApi.getWorkbenchSnapshot();
+      const next = await topologyApi.getWorkbenchSnapshot(caseId);
       setSnapshot(next);
       setApiError(topologyApi.getLastError());
       if (nodeId) {
@@ -100,7 +155,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Failed to sync workspace");
     }
-  }, []);
+  }, [caseId]);
 
   const mergeNode = useCallback(
     async (nodeId: string) => {
@@ -141,18 +196,18 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
   const setViewingVersion = useCallback(
     async (nodeId: string) => {
       try {
-        await topologyApi.setViewingVersion(nodeId);
+        await topologyApi.setViewingVersion(caseId, nodeId);
         await syncAfterMutation(selectedNodeId ?? nodeId);
       } catch (error) {
         setApiError(error instanceof Error ? error.message : "Failed to switch viewing version");
       }
     },
-    [selectedNodeId, syncAfterMutation],
+    [caseId, selectedNodeId, syncAfterMutation],
   );
 
   const uploadFiles = useCallback(async (files: File[], relativePaths: Array<string | null> = []) => {
     try {
-      const result = await topologyApi.uploadFiles(files, relativePaths);
+      const result = await topologyApi.uploadFiles(caseId, files, relativePaths, llmConfig);
       setSnapshot(result.workbench);
       setApiError(topologyApi.getLastError());
       return result;
@@ -161,11 +216,11 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       setApiError(message);
       throw error instanceof Error ? error : new Error(message);
     }
-  }, []);
+  }, [caseId, llmConfig]);
 
   const removeFolder = useCallback(async (folderPath: string) => {
     try {
-      const result = await topologyApi.removeFolder(folderPath);
+      const result = await topologyApi.removeFolder(caseId, folderPath);
       setSnapshot(result.workbench);
       setApiError(topologyApi.getLastError());
       return result;
@@ -174,11 +229,14 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       setApiError(message);
       throw error instanceof Error ? error : new Error(message);
     }
-  }, []);
+  }, [caseId]);
 
   const deleteCase = useCallback(async (confirmText: string) => {
     try {
-      const result = await topologyApi.deleteCase(confirmText);
+      const result = await topologyApi.deleteCase(caseId, confirmText);
+      const nextCaseId = generateCaseId();
+      persistCaseId(nextCaseId);
+      setCaseId(nextCaseId);
       setSnapshot(null);
       setChatMessages([]);
       setSelectedNodeId(null);
@@ -190,12 +248,21 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       setApiError(message);
       throw error instanceof Error ? error : new Error(message);
     }
+  }, [caseId]);
+
+  const updateLlmConfig = useCallback((next: LlmSessionConfig) => {
+    const normalized = {
+      apiKey: next.apiKey.trim(),
+      modelName: next.modelName.trim() || DEFAULT_LLM_MODEL_NAME,
+    };
+    persistLlmConfig(normalized);
+    setLlmConfig(normalized);
   }, []);
 
   const sendChatMessage = useCallback(async (message: string) => {
     setChatSending(true);
     try {
-      const result = await topologyApi.sendChatMessage(message);
+      const result = await topologyApi.sendChatMessage(caseId, message, llmConfig);
       setChatMessages(result.messages);
       setApiError(topologyApi.getLastError());
     } catch (error) {
@@ -205,10 +272,12 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     } finally {
       setChatSending(false);
     }
-  }, []);
+  }, [caseId, llmConfig]);
 
   const value = useMemo<WorkbenchContextValue>(
     () => ({
+      caseId,
+      llmConfig,
       snapshot,
       chatMessages,
       chatSending,
@@ -226,20 +295,24 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
       uploadFiles,
       removeFolder,
       deleteCase,
+      updateLlmConfig,
       sendChatMessage,
       refresh,
     }),
     [
       archiveNode,
       apiError,
+      caseId,
       chatMessages,
       chatSending,
       detailLoading,
+      llmConfig,
       loading,
       mergeNode,
       refresh,
       rejectNode,
       deleteCase,
+      updateLlmConfig,
       sendChatMessage,
       selectNode,
       selectedNodeDetail,

@@ -639,6 +639,7 @@ def process_file(
     model: str,
     max_chars: int,
     tasks: list[str],
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     blocks = parse_docx(path)
     chunks = make_chunks(blocks, max_chars=max_chars)
@@ -702,10 +703,10 @@ def process_file(
         }
     else:
         load_dotenv_if_available()
-        api_key = os.getenv("LLM_API_KEY")
-        if not api_key:
+        effective_api_key = (api_key or os.getenv("LLM_API_KEY") or "").strip()
+        if not effective_api_key:
             raise RuntimeError("LLM_API_KEY is missing. Add it to .env or export it.")
-        extractor = GeminiExtractor(api_key=api_key, model=model)
+        extractor = GeminiExtractor(api_key=effective_api_key, model=model)
 
         task_results: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []

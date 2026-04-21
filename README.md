@@ -9,7 +9,7 @@ VeriCap 是一个面向创业公司融资尽调场景的 AI 辅助 cap table 审
 - DOCX 处理流水线
 - SQLite 工作台存储
 - 样例数据与已处理结果
-- 通过 `LLM_API_KEY` 启用的可选 LLM 抽取能力
+- 通过应用内输入的 API key 或后端环境变量启用的可选 LLM 抽取能力
 
 ## VeriCap 做什么
 
@@ -50,7 +50,7 @@ VeriCap 是审计辅助工具，不提供最终法律结论，也不能替代律
 
 可选：
 
-- 如果需要启用 LLM 抽取，请准备可用的 `LLM_API_KEY`。如果未配置，系统会回退到本地规则抽取和演示数据。
+- 如果需要启用 LLM 抽取，请准备可用的 API key。推荐在应用内 `Workspace Settings` 中输入；如果未配置，系统会回退到本地规则抽取和演示数据。
 
 ## 环境变量
 
@@ -63,8 +63,9 @@ LLM_MODEL_NAME=gemini-3-flash-preview
 ```
 
 - 前端会从主目录 `.env` 读取 `VITE_API_BASE_URL`。
-- 后端会从主目录 `.env` 读取 `LLM_API_KEY` 和 `LLM_MODEL_NAME`。
-- 如果没有提供 `LLM_API_KEY`，后端会在上传处理和聊天解释中回退到本地确定性逻辑。
+- 推荐在应用内 `Workspace Settings` 输入用户自己的 API key 和模型名；这些设置只保存在当前浏览器 session。
+- 后端仍可从主目录 `.env` 读取 `LLM_API_KEY` 和 `LLM_MODEL_NAME` 作为本地开发兜底。
+- 如果没有提供 API key，上传处理会回退到本地确定性逻辑，聊天解释则需要先在应用内补充 key。
 
 ## 后端启动
 
@@ -174,11 +175,7 @@ POST /api/cases/{case_id}/viewing-version
 POST /api/process
 ```
 
-默认 case ID 为：
-
-```text
-case-default
-```
+前端工作台现在会为每个浏览器 session 生成独立 `case_id`，不再依赖固定的 `case-default`。
 
 ## 常用开发命令
 
