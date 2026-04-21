@@ -51,6 +51,7 @@ VeriCap 是审计辅助工具，不提供最终法律结论，也不能替代律
 可选：
 
 - 如果需要启用 LLM 抽取，请准备可用的 DeepSeek API key。推荐在应用内 `Workspace Settings` 中输入；如果未配置，系统会回退到本地规则抽取和演示数据。
+- 完成一次性安装后，推荐直接在仓库根目录运行 `npm run dev`，它会自动先启动后端，再拉起前端。
 
 ## 环境变量
 
@@ -67,7 +68,7 @@ DEEPSEEK_MODEL_NAME=deepseek-chat
 - 后端仍可从主目录 `.env` 读取 `DEEPSEEK_API_KEY` 和 `DEEPSEEK_MODEL_NAME` 作为本地开发兜底。
 - 如果没有提供 API key，上传处理会回退到本地确定性逻辑，聊天解释则需要先在应用内补充 key。
 
-## 后端启动
+## 一次性安装
 
 在仓库根目录执行：
 
@@ -75,12 +76,44 @@ DEEPSEEK_MODEL_NAME=deepseek-chat
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r backend/requirements.txt
+npm install
 ```
 
-启动 FastAPI 后端：
+安装前端依赖：
 
 ```bash
-uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000
+cd frontend
+npm install
+cd ..
+```
+
+## 推荐启动方式
+
+在仓库根目录执行：
+
+```bash
+npm run dev
+```
+
+这个命令会自动：
+
+- 启动 FastAPI 后端
+- 等待后端健康检查通过
+- 启动前端 Vite 开发服务器
+
+默认地址：
+
+```text
+前端: http://127.0.0.1:5173
+后端: http://127.0.0.1:8000
+```
+
+## 分开启动后端
+
+如果你仍然需要单独启动后端：
+
+```bash
+npm run dev:backend
 ```
 
 健康检查：
@@ -95,14 +128,12 @@ curl http://127.0.0.1:8000/api/health
 {"status":"ok"}
 ```
 
-## 前端启动
+## 分开启动前端
 
 打开第二个终端并执行：
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev:frontend
 ```
 
 Vite 默认通常运行在：
@@ -119,8 +150,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## 如何使用
 
-1. 启动后端。
-2. 启动前端。
+1. 运行 `npm run dev`。
 3. 在浏览器打开 Vite 地址。
 4. 进入工作台页面。
 5. 在左侧或文件区域上传一个或多个融资文件。
@@ -192,7 +222,7 @@ npm run preview
 后端：
 
 ```bash
-uvicorn backend.api_server:app --reload --host 127.0.0.1 --port 8000
+npm run dev:backend
 python3 backend/process_docx_data.py --input data --output storage
 ```
 

@@ -205,9 +205,39 @@ def refresh_index() -> dict:
     return index
 
 
+def build_system_status() -> dict:
+    default_snapshot = build_workbench_snapshot(DEFAULT_CASE_ID)
+    has_demo_documents = len(default_snapshot["documents"]) > 0
+    has_demo_versions = len(default_snapshot["captableVersions"]) > 0
+
+    return {
+        "api": {
+            "status": "ok",
+        },
+        "workspace": {
+            "defaultCaseId": DEFAULT_CASE_ID,
+            "defaultCaseAvailable": has_demo_documents,
+            "defaultCaseName": default_snapshot["workspace"]["caseName"],
+        },
+        "llm": {
+            "configured": bool(llm_api_key()),
+            "modelName": pipeline_model_name(),
+        },
+        "mode": {
+            "demoDataAvailable": has_demo_documents or has_demo_versions,
+            "storage": "local",
+        },
+    }
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/system-status")
+def system_status() -> dict:
+    return build_system_status()
 
 
 @app.get("/api/documents")

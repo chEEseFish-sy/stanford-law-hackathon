@@ -210,3 +210,44 @@ export interface LlmSessionConfig {
   apiKey: string;
   modelName: string;
 }
+
+export type WorkspaceEntryState =
+  | "ready"
+  | "backend_unreachable"
+  | "loading"
+  | "demo_available"
+  | "workspace_empty"
+  | "llm_not_configured";
+
+export type ApiErrorCategory =
+  | "network_unreachable"
+  | "server_error"
+  | "validation_error"
+  | "not_found"
+  | "unknown";
+
+export interface ApiFailure {
+  category: ApiErrorCategory;
+  message: string;
+  statusCode?: number;
+  detail?: string;
+}
+
+export interface SystemStatus {
+  api: {
+    status: "ok";
+  };
+  workspace: {
+    defaultCaseId: string;
+    defaultCaseAvailable: boolean;
+    defaultCaseName: string;
+  };
+  llm: {
+    configured: boolean;
+    modelName: string;
+  };
+  mode: {
+    demoDataAvailable: boolean;
+    storage: "local";
+  };
+}
