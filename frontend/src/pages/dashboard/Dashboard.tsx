@@ -1063,9 +1063,9 @@ export function Dashboard() {
 
                 <div className="mt-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-3">
                   <div className="text-[11px] uppercase tracking-[0.18em] text-white/42">Workspace Settings</div>
-                  <div className="mt-2 text-sm font-semibold text-white">LLM Session Config</div>
+                  <div className="mt-2 text-sm font-semibold text-white">DeepSeek Session Config</div>
                   <div className="mt-2 text-xs leading-5 text-white/52">
-                    API key and model stay in this browser session only. Leave API key empty to use local deterministic processing.
+                    DeepSeek API key and model stay in this browser session only. Leave API key empty to use local deterministic processing.
                   </div>
                   <div className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/38">Case ID</div>
                   <div className="mt-1 truncate text-xs text-white/62">{caseId}</div>
@@ -1074,13 +1074,13 @@ export function Dashboard() {
                       value={apiKeyInput}
                       onChange={(event) => setApiKeyInput(event.target.value)}
                       type="password"
-                      placeholder="Enter your LLM API key"
+                      placeholder="Enter your DeepSeek API key"
                       className="w-full rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
                     />
                     <input
                       value={modelNameInput}
                       onChange={(event) => setModelNameInput(event.target.value)}
-                      placeholder="Model name"
+                      placeholder="deepseek-chat"
                       className="w-full rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
                     />
                     <button

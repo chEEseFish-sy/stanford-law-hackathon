@@ -25,7 +25,7 @@ try:
         DEFAULT_MODEL,
         DEFAULT_OUTPUT_DIR,
         DEFAULT_TASKS,
-        GeminiExtractor,
+        DeepSeekExtractor,
         build_index,
         iter_input_files,
         load_dotenv_if_available,
@@ -55,7 +55,7 @@ except ImportError:
         DEFAULT_MODEL,
         DEFAULT_OUTPUT_DIR,
         DEFAULT_TASKS,
-        GeminiExtractor,
+        DeepSeekExtractor,
         build_index,
         iter_input_files,
         load_dotenv_if_available,
@@ -121,12 +121,12 @@ class CaseDeleteRequest(BaseModel):
 
 def pipeline_model_name() -> str:
     load_dotenv_if_available()
-    return os.getenv("LLM_MODEL_NAME", DEFAULT_MODEL)
+    return os.getenv("DEEPSEEK_MODEL_NAME", os.getenv("LLM_MODEL_NAME", DEFAULT_MODEL))
 
 
 def llm_api_key() -> str:
     load_dotenv_if_available()
-    return os.getenv("LLM_API_KEY", "").strip()
+    return os.getenv("DEEPSEEK_API_KEY", os.getenv("LLM_API_KEY", "")).strip()
 
 
 def resolve_model_name(override: str | None = None) -> str:
@@ -185,7 +185,7 @@ def generate_case_chat_reply(case_id: str, message: str, api_key_override: str |
     api_key = resolve_api_key(api_key_override)
     if not api_key:
         raise RuntimeError("LLM API key is missing. Add it in workspace settings or configure the backend environment.")
-    extractor = GeminiExtractor(api_key=api_key, model=resolve_model_name(model_name_override))
+    extractor = DeepSeekExtractor(api_key=api_key, model=resolve_model_name(model_name_override))
     return extractor.generate_text(build_case_chat_prompt(case_id, message))
 
 

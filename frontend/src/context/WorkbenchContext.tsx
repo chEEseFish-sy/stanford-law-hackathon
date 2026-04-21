@@ -12,7 +12,7 @@ import type { ChatMessage, DeletionResponse, LlmSessionConfig, TopologyNodeDetai
 
 const CASE_ID_STORAGE_KEY = "vericap.case_id";
 const LLM_CONFIG_STORAGE_KEY = "vericap.llm_config";
-const DEFAULT_LLM_MODEL_NAME = "gemini-3-flash-preview";
+const DEFAULT_LLM_MODEL_NAME = "deepseek-chat";
 
 const generateCaseId = () => `case-${crypto.randomUUID()}`;
 

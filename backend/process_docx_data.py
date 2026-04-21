@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Process Series A DOCX files into structured JSON.
+"""Process financing DOCX files into structured JSON.
 
 The script reads DOCX files from data/, extracts local candidates, and
-optionally calls Gemini to produce document-level structured data.
+optionally calls DeepSeek to produce document-level structured data.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,7 +24,7 @@ from xml.etree import ElementTree
 
 DEFAULT_INPUT_DIR = Path("data")
 DEFAULT_OUTPUT_DIR = Path("storage")
-DEFAULT_MODEL = "gemini-3-flash-preview"
+DEFAULT_MODEL = "deepseek-chat"
 MAX_CHUNK_CHARS = 18000
 DEFAULT_TASKS = ["metadata", "dates", "financing", "rights", "risks"]
 
@@ -417,44 +419,78 @@ def empty_document_result(
     }
 
 
-class GeminiExtractor:
+class DeepSeekExtractor:
     def __init__(self, api_key: str, model: str) -> None:
-        try:
-            from google import genai
-            from google.genai import types
-        except ImportError as exc:
-            raise RuntimeError(
-                "Missing Gemini SDK. Install dependencies with: "
-                "python3 -m pip install -r backend/requirements.txt"
-            ) from exc
-
-        self.client = genai.Client(api_key=api_key)
+        self.api_key = api_key
         self.model = model
-        self.types = types
+        self.base_url = "https://api.deepseek.com/chat/completions"
+
+    def _request(self, messages: list[dict[str, str]], json_output: bool = False, temperature: float = 0) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "temperature": temperature,
+        }
+        if json_output:
+            payload["response_format"] = {"type": "json_object"}
+
+        request = urllib.request.Request(
+            self.base_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            raise RuntimeError(f"DeepSeek API request failed ({exc.code}): {detail or exc.reason}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"DeepSeek API request failed: {exc.reason}") from exc
 
     def generate_json(self, prompt: str) -> dict[str, Any]:
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=self.types.GenerateContentConfig(
-                temperature=0,
-                response_mime_type="application/json",
-            ),
+        response = self._request(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a legal document extraction assistant. Return only valid JSON.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            json_output=True,
+            temperature=0,
         )
-        text = getattr(response, "text", None) or ""
+        text = (
+            response.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+        )
         return parse_json_response(text)
 
     def generate_text(self, prompt: str) -> str:
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=self.types.GenerateContentConfig(
-                temperature=0.2,
-            ),
+        response = self._request(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant for financing document review.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
         )
-        text = (getattr(response, "text", None) or "").strip()
+        text = (
+            response.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
         if not text:
-            raise ValueError("Gemini response was empty")
+            raise ValueError("DeepSeek response was empty")
         return text
 
 
@@ -472,7 +508,7 @@ def parse_json_response(text: str) -> dict[str, Any]:
             raise
         parsed = json.loads(text[start : end + 1])
     if not isinstance(parsed, dict):
-        raise ValueError("Gemini response must be a JSON object")
+        raise ValueError("DeepSeek response must be a JSON object")
     return parsed
 
 
@@ -703,10 +739,10 @@ def process_file(
         }
     else:
         load_dotenv_if_available()
-        effective_api_key = (api_key or os.getenv("LLM_API_KEY") or "").strip()
+        effective_api_key = (api_key or os.getenv("DEEPSEEK_API_KEY") or os.getenv("LLM_API_KEY") or "").strip()
         if not effective_api_key:
-            raise RuntimeError("LLM_API_KEY is missing. Add it to .env or export it.")
-        extractor = GeminiExtractor(api_key=effective_api_key, model=model)
+            raise RuntimeError("DeepSeek API key is missing. Add DEEPSEEK_API_KEY to .env or provide it from the app.")
+        extractor = DeepSeekExtractor(api_key=effective_api_key, model=model)
 
         task_results: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
@@ -822,11 +858,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_DIR, help="Input directory containing DOCX files.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_DIR, help="Output directory for JSON files.")
     parser.add_argument("--file", type=Path, default=None, help="Process one DOCX file instead of the input directory.")
-    parser.add_argument("--llm", action="store_true", help="Call Gemini on task-specific candidate paragraphs.")
+    parser.add_argument("--llm", action="store_true", help="Call DeepSeek on task-specific candidate paragraphs.")
     parser.add_argument(
         "--no-llm",
         action="store_true",
-        help="Deprecated alias for the default behavior. No Gemini calls are made unless --llm is set.",
+        help="Deprecated alias for the default behavior. No DeepSeek calls are made unless --llm is set.",
     )
     parser.add_argument(
         "--task",
@@ -845,7 +881,7 @@ def main(argv: list[str]) -> int:
     MAX_CHUNK_CHARS = args.max_chars
 
     load_dotenv_if_available()
-    model = os.getenv("LLM_MODEL_NAME", DEFAULT_MODEL)
+    model = os.getenv("DEEPSEEK_MODEL_NAME", os.getenv("LLM_MODEL_NAME", DEFAULT_MODEL))
     tasks = DEFAULT_TASKS if not args.task or "all" in args.task else args.task
     files = iter_input_files(args.input, args.file)
     if not files:
