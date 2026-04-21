@@ -403,6 +403,10 @@ def empty_document_result(
             "closing_terms": [],
             "milestones": [],
         },
+        "security_facts": [],
+        "holder_facts": [],
+        "transaction_facts": [],
+        "table_facts": [],
         "investor_rights": [],
         "company_obligations": [],
         "transfer_or_voting_restrictions": [],
@@ -579,6 +583,45 @@ def task_schema(task: str) -> dict[str, Any]:
                 "closing_terms": [],
                 "milestones": [],
             },
+            "security_facts": [
+                {
+                    "security_type": "",
+                    "share_class": "",
+                    "series": "",
+                    "shares_authorized": "",
+                    "shares_issued": "",
+                    "shares_outstanding": "",
+                    "shares_reserved": "",
+                    "price_per_share": "",
+                    "evidence": [{"paragraph_id": 0, "source_text": ""}],
+                }
+            ],
+            "holder_facts": [
+                {
+                    "holder_name": "",
+                    "holder_role": "",
+                    "security_type": "",
+                    "series": "",
+                    "share_count": "",
+                    "cash_paid": "",
+                    "evidence": [{"paragraph_id": 0, "source_text": ""}],
+                }
+            ],
+            "transaction_facts": [
+                {
+                    "event_type": "",
+                    "holder_name": "",
+                    "security_type": "",
+                    "series": "",
+                    "quantity": "",
+                    "unit_price": "",
+                    "amount": "",
+                    "date_original": "",
+                    "date_iso": None,
+                    "status": "",
+                    "evidence": [{"paragraph_id": 0, "source_text": ""}],
+                }
+            ],
             "confidence": 0.0,
         },
         "rights": {
@@ -620,6 +663,10 @@ def deterministic_merge(
         result["parties"] = merge_list(result["parties"], chunk_result.get("parties"))
         result["dates"] = merge_list(result["dates"], chunk_result.get("dates"))
         for field in [
+            "security_facts",
+            "holder_facts",
+            "transaction_facts",
+            "table_facts",
             "investor_rights",
             "company_obligations",
             "transfer_or_voting_restrictions",
@@ -722,6 +769,7 @@ def process_file(
 
     write_json(output_dir / "parsed" / f"{safe_stem(path)}.parsed.json", parsed_payload)
     write_json(output_dir / "candidates" / f"{safe_stem(path)}.candidates.json", candidates_payload)
+    parsed_table_facts = extract_table_facts(blocks)
 
     if not use_llm:
         result = empty_document_result(
@@ -737,6 +785,7 @@ def process_file(
         result["candidate_group_counts"] = {
             task: len(items) for task, items in candidate_groups.items()
         }
+        result["table_facts"] = parsed_table_facts
     else:
         load_dotenv_if_available()
         effective_api_key = (api_key or os.getenv("DEEPSEEK_API_KEY") or os.getenv("LLM_API_KEY") or "").strip()
@@ -787,10 +836,38 @@ def process_file(
         result["candidate_group_counts"] = {
             task: len(items) for task, items in candidate_groups.items()
         }
+        result["table_facts"] = merge_list(result.get("table_facts", []), parsed_table_facts)
 
     output_path = output_dir / f"{safe_stem(path)}.json"
     write_json(output_path, result)
     return result
+
+
+def extract_table_facts(blocks: list[TextBlock]) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    for block in blocks:
+        if block.block_type != "table":
+            continue
+        raw_text = block.text
+        if ": " not in raw_text:
+            continue
+        _, payload = raw_text.split(": ", 1)
+        try:
+            rows = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rows, list) or not rows:
+            continue
+        header = rows[0] if isinstance(rows[0], list) else []
+        facts.append(
+            {
+                "paragraph_id": block.paragraph_id,
+                "header": header,
+                "rows": rows[1:] if len(rows) > 1 else [],
+                "source_text": trim_evidence(raw_text, limit=900),
+            }
+        )
+    return facts
 
 
 def normalize_result_shape(

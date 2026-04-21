@@ -99,6 +99,7 @@ export interface CapTableVersion {
   generatedFromDocumentIds: string[];
   status: CapTableStatus;
   summary: string;
+  projections: string[];
   rows: Array<{
     holderName: string;
     securityType: string;
@@ -106,6 +107,15 @@ export interface CapTableVersion {
     ownershipPercentage: number;
     sourceDocumentId: string;
     sourceLocation: string;
+    eventIds: string[];
+    evidenceIds: string[];
+    confidence: number;
+    reviewStatus: string;
+    viewType: string;
+    eventStatus: string;
+    statusMeaning: string;
+    shareClass: string;
+    series: string;
   }>;
   createdAt: string;
 }

@@ -62,6 +62,8 @@ interface UploadState {
   details: string[];
 }
 
+type WorkspaceSurfaceMode = "document" | "captable";
+
 const ROOT_FOLDER_NAME = "Root";
 const LEFT_PANEL_WIDTH = 312;
 const RIGHT_PANEL_WIDTH = 332;
@@ -69,6 +71,34 @@ const COLLAPSED_RAIL_WIDTH = 68;
 const PANEL_TRANSITION = { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const };
 const PAGE_TRANSITION = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
 const EMPTY_UPLOAD_STATE: UploadState = { status: "idle", message: null, details: [] };
+
+function formatProjectionLabel(projection: string) {
+  return projection.replace(/_/g, " ");
+}
+
+function formatReviewStatusLabel(status: string) {
+  return status.replace(/_/g, " ");
+}
+
+function getReviewStatusTone(status: string) {
+  if (status === "approved" || status === "verified") {
+    return "border-emerald-400/20 bg-emerald-500/12 text-emerald-100";
+  }
+  if (status === "rejected" || status === "conflict") {
+    return "border-rose-400/20 bg-rose-500/12 text-rose-100";
+  }
+  return "border-amber-300/20 bg-amber-500/12 text-amber-100";
+}
+
+function getConfidenceTone(confidence: number) {
+  if (confidence >= 0.8) {
+    return "text-emerald-100";
+  }
+  if (confidence >= 0.65) {
+    return "text-amber-100";
+  }
+  return "text-rose-100";
+}
 
 function normalizeRelativePath(relativePath?: string | null) {
   if (!relativePath) {
@@ -262,6 +292,11 @@ export function Dashboard() {
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
   const workspaceName = snapshot?.workspace.caseName ?? "Workspace";
   const sampleCapTableCount = snapshot?.captableVersions.length ?? 0;
+  const latestCapTableVersion = useMemo(
+    () => snapshot?.captableVersions.find((version) => version.status === "current") ?? snapshot?.captableVersions[0] ?? null,
+    [snapshot],
+  );
+  const sampleProjectionCount = latestCapTableVersion?.projections.length ?? 0;
   const isBackendUnavailable = entryState === "backend_unreachable";
   const isBackendConnected = !isBackendUnavailable;
   const isLlmConfigured = Boolean(llmConfig.apiKey.trim() || systemStatus?.llm.configured);
@@ -277,6 +312,8 @@ export function Dashboard() {
   const llmStatusLabel = !systemStatus ? "Checking" : isLlmConfigured ? "Configured" : "Not configured";
 
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
+  const [surfaceMode, setSurfaceMode] = useState<WorkspaceSurfaceMode>("document");
+  const [selectedProjection, setSelectedProjection] = useState("");
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedPreviewDocument[]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -362,12 +399,33 @@ export function Dashboard() {
     () => documentItems.find((item) => !item.isUpload) ?? documentItems[0] ?? null,
     [documentItems],
   );
+  const activeCapTableVersion = latestCapTableVersion;
+  const capTableProjections = activeCapTableVersion?.projections ?? [];
+  const effectiveProjection = selectedProjection || capTableProjections[0] || "";
+  const visibleCapTableRows = useMemo(
+    () => activeCapTableVersion?.rows.filter((row) => row.viewType === effectiveProjection) ?? [],
+    [activeCapTableVersion, effectiveProjection],
+  );
+  const isCapTableMode = surfaceMode === "captable" && Boolean(activeCapTableVersion);
 
   useEffect(() => {
     if (selectedDocumentId && !documentItems.some((item) => item.id === selectedDocumentId)) {
       setSelectedDocumentId("");
     }
   }, [documentItems, selectedDocumentId]);
+
+  useEffect(() => {
+    if (!capTableProjections.length) {
+      setSelectedProjection("");
+      if (surfaceMode === "captable") {
+        setSurfaceMode("document");
+      }
+      return;
+    }
+    if (!selectedProjection || !capTableProjections.includes(selectedProjection)) {
+      setSelectedProjection(capTableProjections[0]);
+    }
+  }, [capTableProjections, selectedProjection, surfaceMode]);
 
   useEffect(() => {
     if (!folderGroups.length) {
@@ -476,9 +534,10 @@ export function Dashboard() {
         const nextDocuments = await Promise.all(docxFiles.map((file) => buildUploadedPreview(file)));
         const nextDocumentIds = new Set(nextDocuments.map((document) => document.id));
 
-        setUploadedDocuments((current) => [...nextDocuments, ...current]);
-        setSelectedDocumentId((current) => current || nextDocuments[0]?.id || "");
-        setIsDraggingFiles(false);
+      setUploadedDocuments((current) => [...nextDocuments, ...current]);
+      setSelectedDocumentId((current) => current || nextDocuments[0]?.id || "");
+      setSurfaceMode("document");
+      setIsDraggingFiles(false);
 
         const result = await uploadFiles(
           docxFiles,
@@ -486,11 +545,12 @@ export function Dashboard() {
         );
 
         setUploadedDocuments((current) => current.filter((document) => !nextDocumentIds.has(document.id)));
-        if (result.processed.length > 0) {
-          setSelectedDocumentId(result.topology_updates[0]?.document_id ?? "");
-        } else {
-          setSelectedDocumentId("");
-        }
+      if (result.processed.length > 0) {
+        setSelectedDocumentId(result.topology_updates[0]?.document_id ?? "");
+        setSurfaceMode("document");
+      } else {
+        setSelectedDocumentId("");
+      }
 
         if (result.failures.length > 0 && result.processed.length > 0) {
           setUploadState({
@@ -641,6 +701,7 @@ export function Dashboard() {
   const canGoToPreviousPage = activePageIndex > 0;
   const canGoToNextPage = activePageIndex < totalPages - 1;
   const isReaderError =
+    !isCapTableMode &&
     !!selectedDocumentId &&
     (activeServerDocument?.processingStatus === "error" ||
       (!!wordRendererError && uploadState.status !== "uploading"));
@@ -830,19 +891,43 @@ export function Dashboard() {
         >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div className="min-w-0">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-orange-200/70">Document Reader</div>
+              <div className="text-[11px] uppercase tracking-[0.24em] text-orange-200/70">
+                {isCapTableMode ? "Cap Table Review" : "Document Reader"}
+              </div>
               <div className="mt-1 truncate text-sm font-semibold text-white">
-                {activeDocumentItem?.fileName ?? "No document selected"}
+                {isCapTableMode ? activeCapTableVersion?.versionName ?? "Working cap table" : activeDocumentItem?.fileName ?? "No document selected"}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {activeCapTableVersion ? (
+                <div className="mr-2 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+                  <button
+                    onClick={() => setSurfaceMode("document")}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] transition",
+                      !isCapTableMode ? "bg-orange-500/14 text-orange-100" : "text-white/55 hover:bg-white/[0.04]",
+                    )}
+                  >
+                    Document
+                  </button>
+                  <button
+                    onClick={() => setSurfaceMode("captable")}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] transition",
+                      isCapTableMode ? "bg-orange-500/14 text-orange-100" : "text-white/55 hover:bg-white/[0.04]",
+                    )}
+                  >
+                    Cap Table
+                  </button>
+                </div>
+              ) : null}
               <button
                 onClick={goToPreviousPage}
-                disabled={!canGoToPreviousPage}
+                disabled={isCapTableMode || !canGoToPreviousPage}
                 className={cn(
                   "flex h-10 w-10 items-center justify-center rounded-full border transition",
-                  canGoToPreviousPage
+                  !isCapTableMode && canGoToPreviousPage
                     ? "border-white/10 bg-white/[0.04] text-white hover:border-orange-300/24 hover:bg-orange-500/10 active:scale-[0.97]"
                     : "border-white/6 bg-white/[0.02] text-white/25",
                 )}
@@ -850,14 +935,18 @@ export function Dashboard() {
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <div className="min-w-[76px] text-center text-xs font-medium text-white/52">
-                {selectedDocumentId ? `${Math.min(activePageIndex + 1, Math.max(totalPages, 1))} / ${Math.max(totalPages, 1)}` : "0 / 0"}
+                {isCapTableMode
+                  ? `${visibleCapTableRows.length} row${visibleCapTableRows.length === 1 ? "" : "s"}`
+                  : selectedDocumentId
+                    ? `${Math.min(activePageIndex + 1, Math.max(totalPages, 1))} / ${Math.max(totalPages, 1)}`
+                    : "0 / 0"}
               </div>
               <button
                 onClick={goToNextPage}
-                disabled={!canGoToNextPage}
+                disabled={isCapTableMode || !canGoToNextPage}
                 className={cn(
                   "flex h-10 w-10 items-center justify-center rounded-full border transition",
-                  canGoToNextPage
+                  !isCapTableMode && canGoToNextPage
                     ? "border-white/10 bg-white/[0.04] text-white hover:border-orange-300/24 hover:bg-orange-500/10 active:scale-[0.97]"
                     : "border-white/6 bg-white/[0.02] text-white/25",
                 )}
@@ -868,7 +957,131 @@ export function Dashboard() {
           </div>
 
           <div className="relative flex-1 min-h-0 overflow-hidden px-3 py-3">
-            {!selectedDocumentId ? (
+            {isCapTableMode ? (
+              <ReaderSurface contentClassName="overflow-hidden">
+                <div className="flex h-full min-h-0 flex-col">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/8 pb-4">
+                    <div className="max-w-[560px]">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-orange-200/70">Working version</div>
+                      <div className="mt-2 text-lg font-semibold text-white">
+                        {activeCapTableVersion?.versionName ?? "Working cap table"}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-white/58">
+                        {activeCapTableVersion?.summary ??
+                          "Rows are grouped by projection so you can distinguish issued/outstanding ownership, reserved pool, and fully diluted views."}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {capTableProjections.map((projection) => (
+                        <button
+                          key={projection}
+                          onClick={() => setSelectedProjection(projection)}
+                          className={cn(
+                            "rounded-full border px-3 py-2 text-[11px] font-medium uppercase tracking-[0.16em] transition",
+                            effectiveProjection === projection
+                              ? "border-orange-300/20 bg-orange-500/14 text-orange-100"
+                              : "border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.06]",
+                          )}
+                        >
+                          {formatProjectionLabel(projection)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-4 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Projection</div>
+                      <div className="mt-2 text-sm font-semibold text-white">
+                        {effectiveProjection ? formatProjectionLabel(effectiveProjection) : "Unavailable"}
+                      </div>
+                    </div>
+                    <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-4 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Rows</div>
+                      <div className="mt-2 text-sm font-semibold text-white">{visibleCapTableRows.length}</div>
+                    </div>
+                    <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-4 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Evidence Links</div>
+                      <div className="mt-2 text-sm font-semibold text-white">
+                        {visibleCapTableRows.reduce((sum, row) => sum + row.evidenceIds.length, 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+                    {visibleCapTableRows.length === 0 ? (
+                      <div className="rounded-[18px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm leading-6 text-white/52">
+                        No rows are available for this projection yet. This usually means the extracted events did not meet the rule
+                        boundary for this view.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {visibleCapTableRows.map((row) => (
+                          <div key={`${row.viewType}-${row.holderName}-${row.securityType}-${row.sourceLocation}`} className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">{row.securityType}</div>
+                                <div className="mt-2 text-base font-semibold text-white">{row.holderName}</div>
+                                <div className="mt-2 text-sm leading-6 text-white/58">
+                                  {row.shareClass ? `${row.shareClass}` : "Security class unavailable"}
+                                  {row.series ? ` · ${row.series}` : ""}
+                                  {` · ${row.shares.toLocaleString()} shares`}
+                                  {` · ${row.ownershipPercentage}% of ${formatProjectionLabel(row.viewType)}`}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={cn("text-sm font-semibold", getConfidenceTone(row.confidence))}>
+                                  {Math.round(row.confidence * 100)}% confidence
+                                </div>
+                                <div className="mt-2 text-xs text-white/45">{row.sourceLocation}</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white/60">
+                                {formatProjectionLabel(row.viewType)}
+                              </span>
+                              <span className="rounded-full border border-sky-400/20 bg-sky-500/12 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-sky-100">
+                                {row.eventStatus}
+                              </span>
+                              <span className={cn("rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.16em]", getReviewStatusTone(row.reviewStatus))}>
+                                {formatReviewStatusLabel(row.reviewStatus)}
+                              </span>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr,0.8fr]">
+                              <div className="rounded-[16px] border border-white/8 bg-black/20 px-3 py-3">
+                                <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Why this row exists</div>
+                                <div className="mt-2 text-sm leading-6 text-white/68">{row.statusMeaning}</div>
+                              </div>
+                              <div className="rounded-[16px] border border-white/8 bg-black/20 px-3 py-3">
+                                <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Traceability</div>
+                                <div className="mt-2 text-sm leading-6 text-white/68">
+                                  {row.eventIds.length} event link{row.eventIds.length === 1 ? "" : "s"} · {row.evidenceIds.length} evidence link
+                                  {row.evidenceIds.length === 1 ? "" : "s"}
+                                </div>
+                                {row.evidenceIds.length ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {row.evidenceIds.map((evidenceId) => (
+                                      <span
+                                        key={evidenceId}
+                                        className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-white/52"
+                                      >
+                                        {evidenceId}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ReaderSurface>
+            ) : !selectedDocumentId ? (
               <ReaderSurface>
                 <div className="flex flex-1 items-center justify-center">
                   <div className="max-w-[440px] text-center">
@@ -953,6 +1166,9 @@ export function Dashboard() {
                             <div className="text-[10px] uppercase tracking-[0.18em] text-white/38">Sample Data</div>
                             <div className="mt-2 text-sm font-semibold text-white">{documentItems.length} docs</div>
                             <div className="mt-1 text-xs text-white/50">{sampleCapTableCount} cap table views</div>
+                            <div className="mt-1 text-xs text-white/50">
+                              {latestCapTableVersion?.rows.length ?? 0} rows across {sampleProjectionCount} projections
+                            </div>
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-3">
@@ -960,6 +1176,7 @@ export function Dashboard() {
                             onClick={() => {
                               if (recommendedSampleDocument) {
                                 setSelectedDocumentId(recommendedSampleDocument.id);
+                                setSurfaceMode("document");
                               }
                             }}
                             className="rounded-full bg-sky-500/14 px-4 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/20 active:scale-[0.98]"
@@ -973,6 +1190,28 @@ export function Dashboard() {
                             Review Files Panel
                           </button>
                         </div>
+                        {latestCapTableVersion?.projections.length ? (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {latestCapTableVersion.projections.map((projection) => (
+                              <span
+                                key={projection}
+                                className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white/60"
+                              >
+                                {projection.replace(/_/g, " ")}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {latestCapTableVersion ? (
+                          <div className="mt-4">
+                            <button
+                              onClick={() => setSurfaceMode("captable")}
+                              className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/78 transition hover:bg-white/[0.08] active:scale-[0.98]"
+                            >
+                              Open Working Cap Table
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -1198,6 +1437,18 @@ export function Dashboard() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
+                  {activeCapTableVersion ? (
+                    <button
+                      onClick={() => setSurfaceMode("captable")}
+                      className="col-span-2 rounded-[16px] border border-orange-300/18 bg-orange-500/10 px-3 py-3 text-left transition hover:bg-orange-500/14"
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-orange-100/70">Cap Table</div>
+                      <div className="mt-2 text-sm font-semibold text-white">Open working cap table</div>
+                      <div className="mt-1 text-xs leading-5 text-white/58">
+                        Review projections, confidence, and evidence links without leaving this workspace.
+                      </div>
+                    </button>
+                  ) : null}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1376,7 +1627,10 @@ export function Dashboard() {
                               {group.documents.map((document) => (
                                 <button
                                   key={document.id}
-                                  onClick={() => setSelectedDocumentId(document.id)}
+                                  onClick={() => {
+                                    setSelectedDocumentId(document.id);
+                                    setSurfaceMode("document");
+                                  }}
                                   className={cn(
                                     "flex w-full items-start justify-between gap-3 rounded-[15px] border px-3 py-2.5 text-left transition",
                                     selectedDocumentId === document.id
