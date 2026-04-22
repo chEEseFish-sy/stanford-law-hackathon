@@ -273,9 +273,7 @@ export function Dashboard() {
   const {
     caseId,
     llmConfig,
-    systemStatus,
     entryState,
-    isDefaultCase,
     snapshot,
     chatMessages,
     chatSending,
@@ -286,30 +284,15 @@ export function Dashboard() {
     removeFolder,
     deleteCase,
     updateLlmConfig,
-    openDefaultCase,
   } =
     useWorkbench();
   const documents = useMemo(() => snapshot?.documents ?? [], [snapshot]);
   const workspaceName = snapshot?.workspace.caseName ?? "Workspace";
-  const sampleCapTableCount = snapshot?.captableVersions.length ?? 0;
   const latestCapTableVersion = useMemo(
     () => snapshot?.captableVersions.find((version) => version.status === "current") ?? snapshot?.captableVersions[0] ?? null,
     [snapshot],
   );
-  const sampleProjectionCount = latestCapTableVersion?.projections.length ?? 0;
   const isBackendUnavailable = entryState === "backend_unreachable";
-  const isBackendConnected = !isBackendUnavailable;
-  const isLlmConfigured = Boolean(llmConfig.apiKey.trim() || systemStatus?.llm.configured);
-  const canUseSampleWorkspace = Boolean(systemStatus?.mode.demoDataAvailable);
-  const backendStatusLabel = entryState === "loading" ? "Checking" : isBackendConnected ? "Connected" : "Unavailable";
-  const modeStatusLabel = !systemStatus
-    ? "Checking"
-    : isDefaultCase && canUseSampleWorkspace
-      ? "Sample workspace"
-      : canUseSampleWorkspace
-        ? "Sample available"
-        : "Empty workspace";
-  const llmStatusLabel = !systemStatus ? "Checking" : isLlmConfigured ? "Configured" : "Not configured";
 
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [surfaceMode, setSurfaceMode] = useState<WorkspaceSurfaceMode>("document");
@@ -395,10 +378,6 @@ export function Dashboard() {
       }));
   }, [documentItems]);
 
-  const recommendedSampleDocument = useMemo(
-    () => documentItems.find((item) => !item.isUpload) ?? documentItems[0] ?? null,
-    [documentItems],
-  );
   const activeCapTableVersion = latestCapTableVersion;
   const capTableProjections = activeCapTableVersion?.projections ?? [];
   const effectiveProjection = selectedProjection || capTableProjections[0] || "";
@@ -1084,151 +1063,23 @@ export function Dashboard() {
             ) : !selectedDocumentId ? (
               <ReaderSurface>
                 <div className="flex flex-1 items-center justify-center">
-                  <div className="max-w-[440px] text-center">
+                  <div className="max-w-[360px] text-center">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-orange-300/18 bg-orange-500/10 text-orange-200">
                       <FileText className="h-7 w-7" />
                     </div>
                     <h2 className="mt-6 text-2xl font-semibold text-white">
                       {entryState === "loading"
-                        ? "正在检查工作区状态"
+                        ? "正在准备阅读区"
                         : entryState === "backend_unreachable"
-                        ? "后端未连接"
-                        : entryState === "demo_available"
-                          ? "打开示例工作区"
-                          : isDefaultCase && documentItems.length > 0
-                            ? "开始浏览示例工作区"
-                          : snapshot
-                            ? "开始新的工作区"
-                            : "Workspace 已永久删除"}
+                          ? "后端未连接"
+                          : "请选择文档"}
                     </h2>
                     <p className="mt-4 text-sm leading-7 text-white/58">
-                      {entryState === "loading"
-                        ? "正在确认后端连接、示例数据和当前工作区状态。请稍等片刻。"
-                        : entryState === "backend_unreachable"
-                        ? "当前无法连接到本地后端。请先运行 `npm run dev`，然后刷新页面。Workspace Settings 仍然可用。"
-                        : entryState === "demo_available"
-                          ? "当前有现成的示例数据可直接查看。你也可以跳过示例，直接上传新的 DOCX 文档开始审阅。"
-                          : isDefaultCase && documentItems.length > 0
-                            ? "你正在查看内置示例数据。建议先打开一份示例文件，确认文档阅读区、文件列表和当前工作区状态，再决定是否上传你自己的 DOCX。"
-                          : snapshot
-                            ? "从右侧 `Files` 选择一份文档，或先上传新的 DOCX 文档。进入后使用左右按钮切换分页。"
-                            : "当前 case 的上传文件、结构化结果、工作台派生数据和聊天上下文已经被永久清理。你可以上传新的 DOCX 重新开始。"}
+                      {entryState === "backend_unreachable"
+                        ? "当前无法加载文档。请先启动本地后端服务。"
+                        : "从右侧 Files 中选择文档，或上传新的 DOCX 文件。"}
                     </p>
-                    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                      <span
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em]",
-                          isBackendConnected
-                            ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-100"
-                            : "border-rose-400/20 bg-rose-500/12 text-rose-100",
-                        )}
-                      >
-                        Backend {backendStatusLabel}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em]",
-                          canUseSampleWorkspace
-                            ? "border-sky-400/20 bg-sky-500/12 text-sky-100"
-                            : "border-white/10 bg-white/[0.04] text-white/60",
-                        )}
-                      >
-                        {modeStatusLabel}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em]",
-                          isLlmConfigured
-                            ? "border-amber-300/20 bg-amber-500/12 text-amber-100"
-                            : "border-white/10 bg-white/[0.04] text-white/60",
-                        )}
-                      >
-                        LLM {llmStatusLabel}
-                      </span>
-                    </div>
-                    {!isLlmConfigured ? (
-                      <div className="mt-4 rounded-[16px] border border-amber-300/15 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                        AI explanation is limited until you add an API key in Workspace Settings.
-                      </div>
-                    ) : null}
-                    {isDefaultCase && documentItems.length > 0 ? (
-                      <div className="mt-4 rounded-[18px] border border-sky-400/14 bg-sky-500/[0.08] px-4 py-4 text-left">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-[11px] uppercase tracking-[0.18em] text-sky-100/70">Guided Sample</div>
-                            <div className="mt-2 text-sm font-semibold text-white">Suggested first step</div>
-                            <div className="mt-2 text-sm leading-6 text-white/65">
-                              Open {recommendedSampleDocument?.fileName ?? "the first sample file"} first, then use the Files
-                              panel to compare how the sample workspace is organized.
-                            </div>
-                          </div>
-                          <div className="rounded-[14px] border border-white/10 bg-black/20 px-3 py-2 text-right">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/38">Sample Data</div>
-                            <div className="mt-2 text-sm font-semibold text-white">{documentItems.length} docs</div>
-                            <div className="mt-1 text-xs text-white/50">{sampleCapTableCount} cap table views</div>
-                            <div className="mt-1 text-xs text-white/50">
-                              {latestCapTableVersion?.rows.length ?? 0} rows across {sampleProjectionCount} projections
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <button
-                            onClick={() => {
-                              if (recommendedSampleDocument) {
-                                setSelectedDocumentId(recommendedSampleDocument.id);
-                                setSurfaceMode("document");
-                              }
-                            }}
-                            className="rounded-full bg-sky-500/14 px-4 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/20 active:scale-[0.98]"
-                          >
-                            Open Recommended File
-                          </button>
-                          <button
-                            onClick={() => setIsRightPanelCollapsed(false)}
-                            className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/75 transition hover:bg-white/[0.08] active:scale-[0.98]"
-                          >
-                            Review Files Panel
-                          </button>
-                        </div>
-                        {latestCapTableVersion?.projections.length ? (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {latestCapTableVersion.projections.map((projection) => (
-                              <span
-                                key={projection}
-                                className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white/60"
-                              >
-                                {projection.replace(/_/g, " ")}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        {latestCapTableVersion ? (
-                          <div className="mt-4">
-                            <button
-                              onClick={() => setSurfaceMode("captable")}
-                              className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/78 transition hover:bg-white/[0.08] active:scale-[0.98]"
-                            >
-                              Open Working Cap Table
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                      {entryState === "demo_available" ? (
-                        <button
-                          onClick={() => void openDefaultCase()}
-                          disabled={!canUseSampleWorkspace || isBackendUnavailable}
-                          className={cn(
-                            "rounded-full px-5 py-3 text-sm font-medium transition",
-                            canUseSampleWorkspace && !isBackendUnavailable
-                              ? "bg-orange-500/14 text-orange-100 hover:bg-orange-500/20 active:scale-[0.98]"
-                              : "cursor-not-allowed bg-orange-500/8 text-orange-100/35",
-                          )}
-                        >
-                          Open Sample Workspace
-                        </button>
-                      ) : null}
                       <button
                         onClick={() => {
                           setIsRightPanelCollapsed(false);
@@ -1241,7 +1092,7 @@ export function Dashboard() {
                             : "bg-orange-500/14 text-orange-100 hover:bg-orange-500/20 active:scale-[0.98]",
                         )}
                       >
-                        {entryState === "backend_unreachable" ? "查看文件面板" : "选择文件"}
+                        打开文件面板
                       </button>
                       <button
                         onClick={() => folderInputRef.current?.click()}
@@ -1265,15 +1116,6 @@ export function Dashboard() {
             ) : activeDocumentIsDocx ? (
               <ReaderSurface contentClassName="overflow-hidden">
                 <div className="relative flex h-full min-h-0 flex-col">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-white/28">
-                      Page {Math.min(activePageIndex + 1, Math.max(totalPages, 1))}
-                    </div>
-                    <div className="rounded-full border border-white/8 bg-white/[0.02] px-2.5 py-1 text-[9px] uppercase tracking-[0.18em] text-white/38">
-                      {activeDocumentItem?.evidenceStatus ?? "ready"}
-                    </div>
-                  </div>
-
                   <motion.div
                     animate={{ x: 0 }}
                     transition={PAGE_TRANSITION}
@@ -1375,26 +1217,25 @@ export function Dashboard() {
             <div className="flex h-full min-w-0 flex-col">
               <div className="border-b border-white/10 px-4 py-3.5">
                 <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => setIsRightPanelCollapsed(true)}
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/65 transition hover:border-orange-300/24 hover:bg-orange-500/10 hover:text-orange-100 active:scale-[0.97]"
-                  >
-                    <PanelRightClose className="h-4 w-4" />
-                  </button>
-
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setIsSettingsDialogOpen(true)}
-                      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/[0.08] active:scale-[0.98]"
+                      onClick={() => setIsRightPanelCollapsed(true)}
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/65 transition hover:border-orange-300/24 hover:bg-orange-500/10 hover:text-orange-100 active:scale-[0.97]"
                     >
-                      <Settings2 className="h-3.5 w-3.5" />
-                      Settings
+                      <PanelRightClose className="h-4 w-4" />
                     </button>
+                    <button
+                      onClick={() => setIsSettingsDialogOpen(true)}
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/65 transition hover:border-orange-300/24 hover:bg-orange-500/10 hover:text-orange-100 active:scale-[0.97]"
+                      aria-label="Open settings"
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-white/38">
-                        {isDefaultCase ? "Sample Workspace" : "Workspace"}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold text-white">{isDefaultCase ? "Sample Files" : "Files"}</div>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-white/38">Workspace</div>
+                      <div className="mt-1 text-sm font-semibold text-white">Files</div>
                     </div>
                     <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/45">
                       {documentItems.length}
@@ -1402,53 +1243,7 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                {isDefaultCase ? (
-                  <div className="mt-3 rounded-[16px] border border-sky-400/15 bg-sky-500/10 px-3 py-3">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-sky-100/70">Sample Workspace</div>
-                    <div className="mt-2 text-sm font-semibold text-white">You are viewing built-in demonstration data.</div>
-                    <div className="mt-2 text-xs leading-5 text-white/62">
-                      Use this workspace to understand the file layout, document reader, and evidence-backed workflow before uploading your own matter.
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Backend</div>
-                    <div
-                      className={cn(
-                        "mt-2 text-xs font-semibold",
-                        isBackendConnected ? "text-emerald-100" : "text-rose-200",
-                      )}
-                    >
-                      {backendStatusLabel}
-                    </div>
-                  </div>
-                  <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Mode</div>
-                    <div className="mt-2 text-xs font-semibold text-sky-100">{modeStatusLabel}</div>
-                  </div>
-                  <div className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">LLM</div>
-                    <div className={cn("mt-2 text-xs font-semibold", isLlmConfigured ? "text-amber-100" : "text-white/65")}>
-                      {llmStatusLabel}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  {activeCapTableVersion ? (
-                    <button
-                      onClick={() => setSurfaceMode("captable")}
-                      className="col-span-2 rounded-[16px] border border-orange-300/18 bg-orange-500/10 px-3 py-3 text-left transition hover:bg-orange-500/14"
-                    >
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-orange-100/70">Cap Table</div>
-                      <div className="mt-2 text-sm font-semibold text-white">Open working cap table</div>
-                      <div className="mt-1 text-xs leading-5 text-white/58">
-                        Review projections, confidence, and evidence links without leaving this workspace.
-                      </div>
-                    </button>
-                  ) : null}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1508,12 +1303,6 @@ export function Dashboard() {
                   </button>
                 </div>
 
-                {isBackendUnavailable ? (
-                  <div className="mt-3 rounded-[16px] border border-rose-400/15 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-100">
-                    Backend unavailable. Start `npm run dev` to enable uploads, document loading, and sample data access.
-                  </div>
-                ) : null}
-
                 {uploadState.message ? (
                   <div
                     className={cn(
@@ -1536,41 +1325,12 @@ export function Dashboard() {
                   </div>
                 ) : null}
 
-                {snapshot ? (
-                  <div className="mt-3 rounded-[18px] border border-rose-400/14 bg-rose-500/[0.08] px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-rose-200/70">Danger Zone</div>
-                      <div className="mt-2 text-sm font-semibold text-white">Delete Current Workspace</div>
-                      <div className="mt-2 text-xs leading-5 text-white/58">
-                        Permanently deletes uploaded files, structured results, cap table outputs, topology data, and chat
-                        history for {workspaceName}.
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setCaseDeleteError(null);
-                        setCaseDeleteConfirmText("");
-                        setIsCaseDeleteDialogOpen(true);
-                      }}
-                      className="flex shrink-0 items-center gap-2 rounded-full border border-rose-400/18 bg-rose-500/12 px-3 py-2 text-xs font-medium text-rose-100 transition hover:bg-rose-500/18 active:scale-[0.98]"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
-                  </div>
-                  </div>
-                ) : null}
               </div>
 
               <div className="scrollbar-hidden flex-1 min-h-0 space-y-2 overflow-y-auto px-3 py-3">
                 {folderGroups.length === 0 ? (
                   <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-5 text-sm leading-6 text-white/46">
-                    {isDefaultCase
-                      ? "示例工作区当前没有可显示的文件。你可以切回私有工作区并上传 DOCX，或刷新后再次检查示例数据。"
-                      : canUseSampleWorkspace
-                        ? "当前没有文档。你可以上传 DOCX，或在首屏打开现有示例工作区。"
-                        : "当前没有文档。上传 DOCX 文件后，它们会出现在这里。"}
+                    当前没有文档。上传 DOCX 文件后，它们会出现在这里。
                   </div>
                 ) : null}
 
@@ -1847,21 +1607,6 @@ export function Dashboard() {
 
               <div className="mt-5 grid gap-3">
                 <div>
-                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-white/38">Case ID</div>
-                  <div className="rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/78">
-                    {caseId}
-                  </div>
-                  <div className="mt-2 text-xs text-white/45">
-                    {isDefaultCase ? "Sample workspace is currently open." : "You are in a private session workspace."}
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-white/38">Backend Status</div>
-                  <div className="rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/78">
-                    {backendStatusLabel}
-                  </div>
-                </div>
-                <div>
                   <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-white/38">DeepSeek API Key</div>
                   <input
                     value={apiKeyInput}
@@ -1880,6 +1625,28 @@ export function Dashboard() {
                     className="w-full rounded-[14px] border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/25"
                   />
                 </div>
+                {snapshot ? (
+                  <div className="rounded-[18px] border border-rose-400/14 bg-rose-500/[0.08] px-4 py-4">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-rose-200/70">Danger Zone</div>
+                    <div className="mt-2 text-sm font-semibold text-white">Delete Current Workspace</div>
+                    <div className="mt-2 text-xs leading-5 text-white/58">
+                      Permanently deletes uploaded files, structured results, cap table outputs, topology data, and chat history
+                      for {workspaceName}.
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsSettingsDialogOpen(false);
+                        setCaseDeleteError(null);
+                        setCaseDeleteConfirmText("");
+                        setIsCaseDeleteDialogOpen(true);
+                      }}
+                      className="mt-4 flex items-center gap-2 rounded-full border border-rose-400/18 bg-rose-500/12 px-3 py-2 text-xs font-medium text-rose-100 transition hover:bg-rose-500/18 active:scale-[0.98]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete Workspace
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-3">
