@@ -9,6 +9,7 @@ import sys
 import os
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -432,7 +433,7 @@ def process_uploads(
             failures.append({"source_file": original_name, "error": "Only .docx files are supported"})
             continue
 
-        destination = stable_upload_destination(original_name)
+        destination = stable_upload_destination(case_id, original_name, relative_path)
         try:
             with destination.open("wb") as target:
                 shutil.copyfileobj(upload.file, target)
@@ -445,9 +446,10 @@ def process_uploads(
                 tasks=tasks,
                 api_key=effective_api_key if enable_llm else None,
             )
+            result["source_file"] = original_name
             processed.append(
                 {
-                    "source_file": destination.name,
+                    "source_file": original_name,
                     "status": result.get("processing_metadata", {}).get("status", "processed"),
                     "output_file": f"{safe_stem(destination)}.json",
                 }
@@ -508,10 +510,14 @@ def parse_file_paths_metadata(file_paths: str | None, file_count: int) -> list[s
     return relative_paths
 
 
-def stable_upload_destination(original_name: str) -> Path:
-    destination = UPLOAD_INPUT_DIR / original_name
+def stable_upload_destination(case_id: str, original_name: str, relative_path: str | None = None) -> Path:
+    source_hint = relative_path or original_name
+    source_stem = safe_stem(Path(source_hint))
+    case_stem = safe_stem(Path(case_id))
+    token = uuid4().hex[:8]
+    destination = UPLOAD_INPUT_DIR / f"{case_stem}__{source_stem}__{token}{Path(original_name).suffix.lower()}"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    return destination
+    return unique_destination(destination)
 
 
 def unique_destination(path: Path) -> Path:

@@ -65,14 +65,14 @@ class DeletionFlowTests(unittest.TestCase):
 
         self.assertEqual(result["scopeType"], "folder")
         self.assertEqual(result["removedCounts"]["files"], 2)
-        self.assertEqual(result["removedCounts"]["messages"], 1)
+        self.assertEqual(result["removedCounts"]["messages"], 0)
         self.assertIsNotNone(result["workbench"])
         self.assertEqual(result["workbench"]["documents"], [])
 
         with store.connect() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) AS count FROM files WHERE case_id = ?", (case_id,)).fetchone()["count"], 0)
             self.assertEqual(conn.execute("SELECT COUNT(*) AS count FROM structured_results WHERE case_id = ?", (case_id,)).fetchone()["count"], 0)
-            self.assertEqual(conn.execute("SELECT COUNT(*) AS count FROM case_messages WHERE case_id = ?", (case_id,)).fetchone()["count"], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS count FROM case_messages WHERE case_id = ?", (case_id,)).fetchone()["count"], 1)
             event = conn.execute("SELECT * FROM deletion_events WHERE id = ?", (result["deletionEventId"],)).fetchone()
 
         self.assertEqual(event["status"], store.DELETION_STATUS_COMPLETED)
@@ -122,6 +122,31 @@ class DeletionFlowTests(unittest.TestCase):
 
         self.assertEqual(detail["node"]["id"], node_id)
         self.assertEqual(detail["document"]["fileName"], "Isolated SPA.docx")
+
+    def test_set_viewing_version_rejects_node_from_another_case(self) -> None:
+        first_case_id = "case-first"
+        second_case_id = "case-second"
+        store.create_case(first_case_id, "First")
+        store.create_case(second_case_id, "Second")
+        self.seed_document(first_case_id, "First SPA.docx", "first/First SPA.docx", "First SPA")
+        self.seed_document(second_case_id, "Second SPA.docx", "second/Second SPA.docx", "Second SPA")
+
+        second_snapshot = store.build_workbench_snapshot(second_case_id)
+        foreign_node_id = second_snapshot["topology"]["nodes"][0]["id"]
+
+        with self.assertRaises(KeyError):
+            store.set_viewing_version(first_case_id, foreign_node_id)
+
+    def test_document_artifact_paths_are_unique_for_distinct_physical_uploads(self) -> None:
+        first_source = store.DEFAULT_OUTPUT_DIR / "uploads" / "case_alpha__series_a__a1.docx"
+        second_source = store.DEFAULT_OUTPUT_DIR / "uploads" / "case_beta__series_a__b2.docx"
+
+        first_paths = store.document_artifact_paths(str(first_source))
+        second_paths = store.document_artifact_paths(str(second_source))
+
+        self.assertEqual(first_paths[0], first_source)
+        self.assertEqual(second_paths[0], second_source)
+        self.assertNotEqual({path.name for path in first_paths}, {path.name for path in second_paths})
 
 
 if __name__ == "__main__":

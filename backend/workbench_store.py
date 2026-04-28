@@ -1038,7 +1038,7 @@ def collect_deletion_scope(conn: sqlite3.Connection, case_id: str, scope_type: s
         cap_node_ids = [row["id"] for row in derived_cap_rows]
         cap_version_ids = [row["entity_id"] for row in derived_cap_rows]
 
-    message_rows = list(conn.execute("SELECT id FROM case_messages WHERE case_id = ?", (case_id,)))
+    message_rows = [] if scope_type == "folder" else list(conn.execute("SELECT id FROM case_messages WHERE case_id = ?", (case_id,)))
     artifact_paths = document_artifact_paths_from_rows(file_rows)
     structured_result_count = count_ids(conn, "structured_results", "document_id", case_id, document_ids)
 
@@ -1164,7 +1164,6 @@ def delete_folder_records(
     delete_ids(conn, "equity_events", "document_id", case_id, document_ids)
     delete_ids(conn, "document_facts", "document_id", case_id, document_ids)
     delete_ids(conn, "files", "id", case_id, document_ids)
-    conn.execute("DELETE FROM case_messages WHERE case_id = ?", (case_id,))
     conn.execute(
         """
         INSERT INTO operation_logs (id, case_id, action, node_id, description, created_at)
@@ -1328,7 +1327,10 @@ def get_node_detail(node_id: str) -> dict[str, Any]:
 
 def set_viewing_version(case_id: str, node_id: str) -> dict[str, Any]:
     with connect() as conn:
-        if not get_node(conn, node_id):
+        node = get_node(conn, node_id)
+        if not node:
+            raise KeyError(node_id)
+        if node["case_id"] != case_id:
             raise KeyError(node_id)
         now = utc_now()
         conn.execute(
